@@ -1,0 +1,2386 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hodnotenie defektov</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EEF0F3;
+    --panel:#FFFFFF;
+    --ink:#1B2130;
+    --ink-soft:#5B6270;
+    --ink-faint:#8A90A0;
+    --line:#D7DBE2;
+    --line-strong:#B7BDC9;
+    --navy:#232E48;
+    --navy-soft:#3A4666;
+    --ok:#1F7A54;
+    --ok-bg:#E4F3EC;
+    --ok-line:#1F7A54;
+    --nok:#AE2E22;
+    --nok-bg:#FBEAE7;
+    --nok-line:#AE2E22;
+    --warn:#96650A;
+    --warn-bg:#FBF0DA;
+    --warn-line:#96650A;
+    --radius-s:4px;
+    --radius-m:6px;
+    --font-sans:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+    --font-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;font-family:var(--font-sans);background:var(--bg);color:var(--ink);-webkit-font-smoothing:antialiased;}
+  button{font-family:inherit;}
+  input,textarea,select{font-family:inherit;}
+
+  .app{min-height:100vh;display:flex;flex-direction:column;}
+
+  .topbar{
+    background:var(--navy);color:#EDEFF4;padding:14px 20px;
+    display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;
+  }
+  .brand{display:flex;align-items:baseline;gap:10px;}
+  .brand-mark{width:10px;height:10px;background:#E7A93C;flex:none;}
+  .brand h1{font-size:16px;font-weight:600;margin:0;letter-spacing:0.2px;}
+  .brand .meta{font-size:12px;color:#AEB6CC;font-family:var(--font-mono);}
+  .topbar-nav{display:flex;gap:6px;}
+  .topbar-nav button{
+    background:transparent;border:1px solid #454F6E;color:#D6DAE8;
+    padding:8px 16px;border-radius:var(--radius-s);font-size:13px;cursor:pointer;
+  }
+  .topbar-nav button:hover{background:#2C3855;}
+  .topbar-nav button.is-active{background:#EDEFF4;color:var(--navy);border-color:#EDEFF4;font-weight:600;}
+
+  .storage-banner{
+    background:#FBEAE7;color:var(--nok);border-bottom:1px solid var(--nok-line);
+    padding:10px 20px;font-size:13px;display:flex;align-items:center;justify-content:space-between;gap:14px;
+    line-height:1.4;
+  }
+  .storage-banner button{background:transparent;border:none;color:inherit;font-size:20px;cursor:pointer;line-height:1;padding:0 4px;}
+
+  main{flex:1;display:flex;flex-direction:column;min-height:0;}
+  .mode{display:none;flex:1;flex-direction:column;min-height:0;}
+  .mode.is-active{display:flex;}
+  .screen{display:none;flex:1;min-height:0;flex-direction:column;}
+  .screen.is-active{display:flex;}
+
+  .centerwrap{align-items:center;justify-content:center;padding:32px 16px;}
+  .panel-narrow{width:100%;max-width:560px;}
+
+  h2.scr-title{font-size:22px;margin:0 0 6px 0;font-weight:600;}
+  p.scr-sub{margin:0;color:var(--ink-soft);font-size:14px;line-height:1.5;}
+
+  .btn{padding:11px 20px;border-radius:var(--radius-s);font-size:14px;font-weight:600;border:1px solid transparent;cursor:pointer;}
+  .btn:disabled{opacity:0.4;cursor:not-allowed;}
+  .btn-primary{background:var(--navy);color:#fff;}
+  .btn-primary:hover:not(:disabled){background:var(--navy-soft);}
+  .btn-ghost{background:transparent;color:var(--navy);border-color:var(--line-strong);}
+  .btn-ghost:hover:not(:disabled){background:#fff;}
+  .btn-danger{background:#fff;color:var(--nok);border-color:var(--nok-line);}
+  .btn-danger:hover:not(:disabled){background:var(--nok-bg);}
+  .btn-sm{padding:7px 12px;font-size:12.5px;}
+  .btn-block{width:100%;}
+
+  .field{margin-bottom:14px;}
+  .field label{display:block;font-size:12px;color:var(--ink-soft);margin-bottom:5px;}
+  .field input[type=text],.field input[type=password],.field select{
+    width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:var(--radius-s);
+    font-size:14px;background:#fff;color:var(--ink);
+  }
+  .field input:focus,.field select:focus{outline:2px solid var(--navy-soft);outline-offset:1px;}
+  .field-error{color:var(--nok);font-size:12.5px;margin-top:6px;}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-m);padding:26px;}
+
+  .dropzone{
+    background:var(--panel);border:1.5px dashed var(--line-strong);border-radius:var(--radius-m);
+    padding:34px 20px;text-align:center;cursor:pointer;transition:border-color .15s ease, background .15s ease;
+  }
+  .dropzone.is-drag{border-color:var(--navy);background:#F3F4FA;}
+  .dropzone.is-loading{opacity:0.6;cursor:wait;pointer-events:none;}
+  .dropzone.is-disabled{opacity:0.5;cursor:not-allowed;pointer-events:none;}
+  .dropzone .icon{
+    width:38px;height:38px;margin:0 auto 12px auto;border:1.5px solid var(--ink-faint);
+    display:flex;align-items:center;justify-content:center;color:var(--ink-faint);
+  }
+  .dropzone strong{display:block;font-size:15px;margin-bottom:4px;}
+  .dropzone span{font-size:13px;color:var(--ink-soft);}
+  input[type=file]{display:none;}
+
+  .thumb-grid{
+    margin-top:14px;display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));
+    gap:6px;max-height:170px;overflow-y:auto;padding-right:2px;
+  }
+  .thumb-grid img{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:3px;border:1px solid var(--line);display:block;}
+
+  .row-between{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;}
+  .status-line{font-size:13px;color:var(--ink-soft);}
+  .status-line strong{color:var(--ink);font-family:var(--font-mono);}
+
+  /* ---------- Batch bar ---------- */
+  .batch-bar{
+    display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;
+    margin-bottom:10px;padding-bottom:20px;border-bottom:1px solid var(--line);
+  }
+  .batch-bar .field{margin-bottom:0;min-width:200px;flex:1;max-width:280px;}
+  .active-indicator{font-size:12.5px;color:var(--ink-soft);margin:-4px 0 22px 0;}
+  .active-indicator strong{color:var(--ok);font-family:var(--font-mono);}
+
+  /* ---------- Photo evaluation stage ---------- */
+  .eval-status-row{
+    padding:10px 20px;display:flex;align-items:center;justify-content:space-between;
+    background:var(--panel);border-bottom:1px solid var(--line);font-size:13px;color:var(--ink-soft);
+    gap:14px;flex-wrap:wrap;
+  }
+  .eval-status-row .pos{font-family:var(--font-mono);color:var(--ink);font-weight:600;}
+  .eval-status-row .filename{font-family:var(--font-mono);font-size:12px;color:var(--ink-faint);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:260px;}
+
+  .photo-stage{flex:1;min-height:0;position:relative;background:#141822;overflow:hidden;}
+  .photo-stage img{
+    position:absolute;top:18px;left:18px;right:18px;bottom:18px;
+    width:calc(100% - 36px);height:calc(100% - 36px);
+    object-fit:contain;box-shadow:0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .stage-nav{
+    position:absolute;top:50%;transform:translateY(-50%);
+    background:rgba(20,24,34,0.55);border:1px solid rgba(255,255,255,0.18);color:#fff;
+    width:42px;height:42px;border-radius:50%;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;font-size:18px;z-index:2;
+  }
+  .stage-nav:hover{background:rgba(20,24,34,0.8);}
+  .stage-nav:disabled{opacity:0.25;cursor:not-allowed;}
+  .stage-nav.prev{left:16px;}
+  .stage-nav.next{right:16px;}
+  .stage-flag{
+    position:absolute;top:16px;left:16px;font-size:12px;font-weight:600;font-family:var(--font-mono);
+    padding:5px 10px;border-radius:3px;letter-spacing:0.3px;color:#fff;z-index:2;
+  }
+
+  .note-row{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 20px;}
+  .note-row input[type=text]{width:100%;border:1px solid var(--line);border-radius:var(--radius-s);padding:8px 10px;font-size:13px;color:var(--ink);}
+  .note-row input:focus{outline:2px solid var(--navy-soft);outline-offset:1px;}
+  .note-row label{display:block;font-size:11px;color:var(--ink-soft);margin-bottom:4px;}
+
+  .verdict-row{background:var(--panel);padding:14px 20px;display:flex;gap:10px;border-bottom:1px solid var(--line);}
+  .verdict-btn{
+    flex:1;min-height:58px;border-radius:var(--radius-m);border:1.5px solid var(--line-strong);background:#fff;
+    font-size:14px;font-weight:600;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:2px;color:var(--ink);transition:transform .06s ease;
+  }
+  .verdict-btn .kb{font-family:var(--font-mono);font-size:11px;color:var(--ink-faint);font-weight:500;}
+  .verdict-btn:active{transform:scale(0.98);}
+  .verdict-btn.ok.is-selected{background:var(--ok-bg);border-color:var(--ok-line);color:var(--ok);}
+  .verdict-btn.warn.is-selected{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn);}
+  .verdict-btn.nok.is-selected{background:var(--nok-bg);border-color:var(--nok-line);color:var(--nok);}
+  .verdict-btn.ok:hover{border-color:var(--ok-line);}
+  .verdict-btn.warn:hover{border-color:var(--warn-line);}
+  .verdict-btn.nok:hover{border-color:var(--nok-line);}
+
+  .filmstrip-wrap{background:var(--panel);padding:10px 20px 14px 20px;}
+  .filmstrip{display:flex;gap:6px;overflow-x:auto;padding-bottom:4px;}
+  .film-item{flex:none;width:48px;height:48px;border-radius:3px;border:2.5px solid var(--line);cursor:pointer;position:relative;overflow:hidden;}
+  .film-item img{width:100%;height:100%;object-fit:cover;display:block;}
+  .film-item.is-current{border-color:var(--navy);box-shadow:0 0 0 2px rgba(35,46,72,0.15);}
+  .film-item.status-ok{border-color:var(--ok-line);}
+  .film-item.status-warn{border-color:var(--warn-line);}
+  .film-item.status-nok{border-color:var(--nok-line);}
+
+  #screen-test-result,#admin-attempt-detail{overflow-y:auto;padding:28px 24px 60px 24px;}
+  .result-wrap{max-width:760px;margin:0 auto;width:100%;}
+  .score-hero{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-m);padding:30px;text-align:center;margin-bottom:22px;}
+  .score-hero .op-name{font-size:13px;color:var(--ink-soft);margin-bottom:10px;}
+  .score-hero .big-pct{font-family:var(--font-mono);font-size:52px;font-weight:600;line-height:1;}
+  .score-hero .big-pct.tier-ok{color:var(--ok);}
+  .score-hero .big-pct.tier-warn{color:var(--warn);}
+  .score-hero .big-pct.tier-nok{color:var(--nok);}
+  .score-hero .frac{font-size:14px;color:var(--ink-soft);margin-top:8px;font-family:var(--font-mono);}
+  .score-hero .when{font-size:12px;color:var(--ink-faint);margin-top:4px;}
+
+  .verdict-list{list-style:none;margin:0;padding:0;}
+  .verdict-list li{display:flex;align-items:center;gap:12px;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--radius-s);margin-bottom:8px;}
+  .verdict-list li:last-child{margin-bottom:0;}
+  .verdict-list li.is-hit{border-color:var(--ok-line);background:var(--ok-bg);}
+  .verdict-list li.is-miss{border-color:var(--nok-line);background:var(--nok-bg);}
+  .verdict-list img{width:38px;height:38px;object-fit:cover;border-radius:3px;border:1px solid var(--line);flex:none;}
+  .verdict-list .vl-name{font-size:13px;color:var(--ink-soft);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mark{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;color:#fff;}
+  .mark.hit{background:var(--ok);}
+  .mark.miss{background:var(--nok);}
+
+  .result-actions{display:flex;gap:10px;margin-top:22px;justify-content:center;flex-wrap:wrap;}
+
+  #screen-admin-gate .card{max-width:400px;margin:0 auto;}
+  .lock-icon{
+    width:36px;height:36px;border:1.5px solid var(--ink-faint);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;margin-bottom:16px;color:var(--ink-faint);font-size:16px;
+  }
+
+  #admin-shell{min-height:0;}
+  .admin-subnav{
+    background:var(--panel);border-bottom:1px solid var(--line);padding:8px 20px;
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+  }
+  .admin-subnav .tabs{display:flex;gap:6px;}
+  .admin-subnav .tabs button{
+    background:transparent;border:1px solid transparent;color:var(--ink-soft);
+    padding:8px 14px;border-radius:var(--radius-s);font-size:13px;cursor:pointer;font-weight:500;
+  }
+  .admin-subnav .tabs button:hover{background:#F0F1F5;}
+  .admin-subnav .tabs button.is-active{background:var(--navy);color:#fff;}
+  .admin-panel{display:none;flex:1;min-height:0;flex-direction:column;overflow-y:auto;padding:24px 24px 60px 24px;}
+  .admin-panel.is-active{display:flex;}
+  .admin-panel-wrap{max-width:760px;margin:0 auto;width:100%;}
+
+  .step-block{margin-bottom:26px;}
+  .step-block h3{font-size:14px;font-weight:600;margin:0 0 4px 0;}
+  .step-block .step-sub{font-size:13px;color:var(--ink-soft);margin:0 0 12px 0;}
+
+  .define-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(64px,1fr));gap:8px;margin-top:14px;}
+  .define-tile{position:relative;border-radius:4px;overflow:hidden;border:2.5px solid var(--line);cursor:pointer;aspect-ratio:1/1;}
+  .define-tile img{width:100%;height:100%;object-fit:cover;display:block;}
+  .define-tile.status-ok{border-color:var(--ok-line);}
+  .define-tile.status-warn{border-color:var(--warn-line);}
+  .define-tile.status-nok{border-color:var(--nok-line);}
+  .define-tile.status-pending{border-color:var(--line-strong);}
+  .define-tile.status-pending::after{content:"";position:absolute;inset:0;background:rgba(20,24,34,0.28);}
+
+  .summary-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:22px;}
+  .summary-card{background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--line-strong);padding:14px 16px;}
+  .summary-card .num{font-family:var(--font-mono);font-size:24px;font-weight:600;line-height:1;}
+  .summary-card .lbl{font-size:12px;color:var(--ink-soft);margin-top:6px;}
+  .summary-card.navy{border-left-color:var(--navy);}
+  .summary-card.ok{border-left-color:var(--ok-line);}
+  .summary-card.ok .num{color:var(--ok);}
+  .summary-card.nok{border-left-color:var(--nok-line);}
+  .summary-card.nok .num{color:var(--nok);}
+
+  table.rtable{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);font-size:13px;}
+  table.rtable th{text-align:left;font-size:11px;font-weight:600;color:var(--ink-soft);padding:9px 12px;border-bottom:1px solid var(--line-strong);background:#F5F6F9;}
+  table.rtable td{padding:8px 12px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  table.rtable tr:last-child td{border-bottom:none;}
+  table.rtable tr.is-clickable{cursor:pointer;}
+  table.rtable tr.is-clickable:hover{background:#F7F8FA;}
+  table.rtable img.rthumb{width:36px;height:36px;object-fit:cover;border-radius:3px;border:1px solid var(--line);display:block;}
+
+  .badge{display:inline-block;font-size:11px;font-weight:600;padding:3px 9px;border-radius:3px;font-family:var(--font-mono);}
+  .badge.ok{background:var(--ok-bg);color:var(--ok);}
+  .badge.warn{background:var(--warn-bg);color:var(--warn);}
+  .badge.nok{background:var(--nok-bg);color:var(--nok);}
+  .badge.pending{background:#EDEFF2;color:var(--ink-faint);}
+  .badge.active{background:var(--ok-bg);color:var(--ok);}
+
+  .section-gap{margin-top:30px;}
+  .empty-state{text-align:center;padding:50px 20px;color:var(--ink-soft);font-size:13.5px;}
+  .toolbar{display:flex;gap:12px;margin-bottom:14px;flex-wrap:wrap;align-items:flex-end;}
+  .toolbar .field{margin-bottom:0;min-width:220px;max-width:300px;}
+  .toolbar .spacer{flex:1;}
+
+  /* ---------- Lightbox (training / feedback review) ---------- */
+  .lightbox{
+    position:fixed;inset:0;background:rgba(10,12,18,0.88);z-index:100;
+    display:flex;align-items:center;justify-content:center;padding:40px 70px;
+  }
+  .lb-body{max-width:900px;max-height:100%;width:100%;display:flex;flex-direction:column;align-items:center;gap:14px;}
+  .lb-body img{max-width:100%;max-height:62vh;object-fit:contain;box-shadow:0 0 0 1px rgba(255,255,255,0.1);}
+  .lb-meta{background:var(--panel);border-radius:var(--radius-m);padding:16px 20px;width:100%;max-width:520px;text-align:center;border:2.5px solid var(--line);}
+  .lb-meta.is-hit{border-color:var(--ok-line);background:var(--ok-bg);}
+  .lb-meta.is-miss{border-color:var(--nok-line);background:var(--nok-bg);}
+  .lb-name{font-family:var(--font-mono);font-size:12px;color:var(--ink-soft);margin-bottom:10px;}
+  .lb-badges{display:flex;gap:8px;justify-content:center;margin-bottom:8px;flex-wrap:wrap;}
+  .lb-note{font-size:13px;color:var(--ink-soft);}
+  .lb-close{position:absolute;top:18px;right:22px;background:transparent;border:none;color:#fff;font-size:28px;cursor:pointer;line-height:1;}
+  .lb-nav{
+    background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.25);color:#fff;
+    width:48px;height:48px;border-radius:50%;cursor:pointer;font-size:20px;flex:none;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .lb-nav:hover{background:rgba(255,255,255,0.22);}
+  .lb-nav:disabled{opacity:0.25;cursor:not-allowed;}
+
+  /* ---------- Dashboard ---------- */
+  .dash-card{padding:16px 18px;margin-bottom:16px;}
+  .dash-card-sm{display:flex;flex-direction:column;}
+  .dash-card-title{font-size:13px;font-weight:600;margin:0 0 4px 0;}
+  .dash-card-sub{font-size:11.5px;color:var(--ink-soft);margin:0 0 10px 0;line-height:1.4;}
+
+  #dash-chart-wrap svg,#dash-bar-wrap svg,#dash-scatter-wrap svg,#dash-pie-wrap svg{width:100%;height:auto;display:block;}
+  .chart-sm{max-height:150px;overflow:hidden;}
+  #dash-chart-wrap .chart-pt{cursor:pointer;}
+  #dash-chart-wrap .chart-pt:hover{r:6;}
+  #dash-bar-wrap .bar-rect{cursor:pointer;transition:opacity .1s ease;}
+  #dash-bar-wrap .bar-rect:hover{opacity:0.82;}
+  #dash-scatter-wrap .scatter-pt{cursor:pointer;}
+  #dash-scatter-wrap .scatter-pt:hover{r:8;}
+
+  .resizable-box{
+    resize:vertical;overflow:auto;min-height:70px;max-height:70vh;
+    border:1px dashed transparent;border-radius:var(--radius-s);
+  }
+  .resizable-box:hover{border-color:var(--line-strong);}
+  #dash-pie-wrap .pie-slice{cursor:pointer;}
+
+  .trend-pill{
+    display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;
+    font-size:11.5px;font-weight:600;background:#EDEFF2;color:var(--ink-soft);flex:none;
+  }
+  .trend-pill.trend-up{background:var(--ok-bg);color:var(--ok);}
+  .trend-pill.trend-down{background:var(--nok-bg);color:var(--nok);}
+  .trend-pill.trend-flat{background:#EDEFF2;color:var(--ink-soft);}
+  .trend-arrow{font-size:13px;line-height:1;}
+
+  .dash-row-top{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:16px;margin-bottom:0;}
+  .dash-row-top .dash-card{margin-bottom:16px;}
+  .dash-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  .dash-grid .dash-card{margin-bottom:16px;}
+
+  .scroll-box{height:230px;overflow-y:auto;resize:vertical;min-height:80px;max-height:70vh;border:1px dashed transparent;border-radius:var(--radius-s);}
+  .scroll-box:hover{border-color:var(--line-strong);}
+
+  .pie-layout{display:flex;align-items:center;gap:12px;flex:1;}
+  .chart-pie{width:110px;flex:none;}
+  .pie-legend{flex:1;display:flex;flex-direction:column;gap:6px;}
+  .pie-legend-row{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--ink);}
+  .pie-legend-dot{width:9px;height:9px;border-radius:50%;flex:none;}
+  .pie-legend-row .pl-count{margin-left:auto;font-family:var(--font-mono);font-weight:600;}
+
+  .hl-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:var(--ink-faint);margin:8px 0 6px 0;}
+  .hl-label:first-child{margin-top:0;}
+  .hl-card-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .hl-card{
+    border-radius:var(--radius-m);border:1px solid var(--line);border-left:4px solid var(--line-strong);
+    padding:9px 10px;background:#fff;
+  }
+  .hl-card.tier-ok{border-left-color:var(--ok-line);background:var(--ok-bg);}
+  .hl-card.tier-warn{border-left-color:var(--warn-line);background:var(--warn-bg);}
+  .hl-card.tier-nok{border-left-color:var(--nok-line);background:var(--nok-bg);}
+  .hl-card .hl-card-name{font-size:11px;font-weight:600;color:var(--ink);margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .hl-card .hl-card-pct{font-family:var(--font-mono);font-size:19px;font-weight:600;line-height:1;}
+  .hl-card.tier-ok .hl-card-pct{color:var(--ok);}
+  .hl-card.tier-warn .hl-card-pct{color:var(--warn);}
+  .hl-card.tier-nok .hl-card-pct{color:var(--nok);}
+  .hl-card .hl-card-count{font-size:10.5px;color:var(--ink-soft);margin-top:3px;}
+  .hl-card .hl-card-flag{font-size:9.5px;font-weight:600;margin-top:5px;padding:1px 6px;border-radius:3px;display:inline-block;background:var(--nok);color:#fff;}
+
+  @media (max-width:980px){
+    .dash-row-top{grid-template-columns:1fr;}
+  }
+  @media (max-width:820px){
+    .dash-grid{grid-template-columns:1fr;}
+  }
+
+  @media (max-width:720px){
+    .lightbox{padding:20px;}
+  }
+
+  @media print{
+    .topbar,.admin-subnav,.toolbar,.result-actions,.dropzone,.batch-bar,.lightbox{display:none !important;}
+    body{background:#fff;}
+    .admin-panel,#screen-test-result{padding:0;overflow:visible;}
+    table.rtable{font-size:11px;}
+  }
+  @media (max-width:720px){
+    .summary-row{grid-template-columns:repeat(2,1fr);}
+    .verdict-row{flex-direction:column;}
+    .eval-status-row .filename{display:none;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark"></div>
+      <div><h1>Hodnotenie defektov</h1></div>
+      <div class="meta" id="topbar-meta"></div>
+    </div>
+    <div class="topbar-nav">
+      <button id="nav-test" class="is-active">Test</button>
+      <button id="nav-admin">Administrácia</button>
+    </div>
+  </div>
+
+  <div class="storage-banner" id="storage-banner" style="display:none;">
+    <span id="storage-banner-text"></span>
+    <button id="storage-banner-close" aria-label="Zavrieť" type="button">&times;</button>
+  </div>
+
+  <main>
+
+    <!-- ========== TEST MODE ========== -->
+    <section id="mode-test" class="mode is-active">
+
+      <section id="screen-test-empty" class="screen centerwrap">
+        <div class="panel-narrow card" style="text-align:center;">
+          <h2 class="scr-title">Test zatiaľ nie je pripravený</h2>
+          <p class="scr-sub" id="empty-reason">Administrátor ešte nenahral fotky defektov.</p>
+        </div>
+      </section>
+
+      <section id="screen-test-start" class="screen centerwrap">
+        <div class="panel-narrow card">
+          <h2 class="scr-title">Nový test</h2>
+          <p class="scr-sub" id="test-start-sub" style="margin-bottom:20px;">Zadajte svoje meno a spustite vyhodnotenie fotiek.</p>
+          <div class="field">
+            <label for="field-op-name">Meno operátora</label>
+            <input type="text" id="field-op-name" list="operator-history" placeholder="napr. Ján Novák" autocomplete="off">
+            <datalist id="operator-history"></datalist>
+            <div class="field-error" id="op-name-error" style="display:none;">Zadajte prosím meno.</div>
+          </div>
+          <button class="btn btn-primary btn-block" id="btn-begin-test">Spustiť test</button>
+        </div>
+      </section>
+
+      <section id="screen-test-eval" class="screen">
+        <div class="eval-status-row">
+          <div class="pos" id="t-eval-pos">Fotka 1 / 1</div>
+          <div class="filename" id="t-eval-filename"></div>
+          <div class="status-line" id="t-eval-operator"></div>
+        </div>
+        <div class="photo-stage">
+          <button class="stage-nav prev" id="t-btn-prev" aria-label="Predchádzajúca fotka">&#8592;</button>
+          <div class="stage-flag" id="t-stage-flag" style="display:none;"></div>
+          <img id="t-stage-img" src="" alt="Fotka defektu">
+          <button class="stage-nav next" id="t-btn-next" aria-label="Nasledujúca fotka">&#8594;</button>
+        </div>
+        <div class="note-row">
+          <label for="t-field-note">Poznámka k fotke (nepovinné)</label>
+          <input type="text" id="t-field-note" placeholder="napr. typ defektu, poloha na diele...">
+        </div>
+        <div class="verdict-row">
+          <button class="verdict-btn ok" data-verdict="OK">OK <span class="kb">1</span></button>
+          <button class="verdict-btn warn" data-verdict="HRANICNE">Hranične OK <span class="kb">2</span></button>
+          <button class="verdict-btn nok" data-verdict="NOK">NOK <span class="kb">3</span></button>
+        </div>
+        <div class="filmstrip-wrap"><div class="filmstrip" id="t-filmstrip"></div></div>
+      </section>
+
+      <section id="screen-test-result" class="screen">
+        <div class="result-wrap">
+          <div class="score-hero">
+            <div class="op-name" id="res-op-name"></div>
+            <div class="big-pct" id="res-pct">0 %</div>
+            <div class="frac" id="res-frac"></div>
+            <div class="when" id="res-when"></div>
+          </div>
+          <ul class="verdict-list" id="res-list"></ul>
+          <div class="result-actions">
+            <button class="btn btn-ghost" id="btn-print-my-result">Vytlačiť môj výsledok</button>
+            <button class="btn btn-primary" id="btn-new-attempt">Nový test (ďalší operátor)</button>
+          </div>
+        </div>
+      </section>
+
+    </section>
+
+    <!-- ========== ADMIN MODE ========== -->
+    <section id="mode-admin" class="mode">
+
+      <section id="screen-admin-gate" class="screen centerwrap">
+        <div class="card panel-narrow">
+          <div class="lock-icon">&#128274;</div>
+          <div id="gate-setpass">
+            <h2 class="scr-title">Prvé spustenie</h2>
+            <p class="scr-sub" style="margin-bottom:18px;">Nastavte heslo správcu. Bude sa vyžadovať pri každom vstupe do administrácie.</p>
+            <div class="field"><label for="field-newpass1">Nové heslo</label><input type="password" id="field-newpass1"></div>
+            <div class="field">
+              <label for="field-newpass2">Potvrďte heslo</label>
+              <input type="password" id="field-newpass2">
+              <div class="field-error" id="setpass-error" style="display:none;"></div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-set-password">Nastaviť heslo a pokračovať</button>
+          </div>
+          <div id="gate-login" style="display:none;">
+            <h2 class="scr-title">Heslo správcu</h2>
+            <p class="scr-sub" style="margin-bottom:18px;">Táto sekcia obsahuje správne odpovede a výsledky operátorov.</p>
+            <div class="field">
+              <label for="field-loginpass">Heslo</label>
+              <input type="password" id="field-loginpass">
+              <div class="field-error" id="login-error" style="display:none;">Nesprávne heslo.</div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-login">Vstúpiť</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="admin-shell" class="screen">
+        <div class="admin-subnav">
+          <div class="tabs">
+            <button id="atab-setup" class="is-active">Nastavenie testu</button>
+            <button id="atab-reports">Reporty</button>
+            <button id="atab-dashboard">Dashboard</button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" id="btn-change-pass">Zmeniť heslo</button>
+            <button class="btn btn-ghost btn-sm" id="btn-logout">Odhlásiť</button>
+          </div>
+        </div>
+
+        <!-- SETUP PANEL -->
+        <div id="admin-setup" class="admin-panel is-active">
+          <div class="admin-panel-wrap">
+
+            <div class="batch-bar" style="margin-bottom:0;padding-bottom:14px;border-bottom:none;">
+              <div class="field">
+                <label for="area-select">Sekcia / projekt (dávka do nej patrí)</label>
+                <select id="area-select"></select>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-new-area">+ Nová sekcia</button>
+            </div>
+
+            <div class="batch-bar">
+              <div class="field">
+                <label for="batch-select">Upravujem dávku</label>
+                <select id="batch-select"></select>
+              </div>
+              <div class="field">
+                <label for="field-batch-label">Názov / popis dávky</label>
+                <input type="text" id="field-batch-label" placeholder="napr. W177 – šarža 4521">
+              </div>
+              <button class="btn btn-ghost btn-sm" id="btn-new-batch">+ Nová dávka</button>
+              <button class="btn btn-primary btn-sm" id="btn-activate-batch">Nastaviť ako aktuálnu pre operátorov</button>
+            </div>
+            <div class="active-indicator" id="active-batch-indicator"></div>
+
+            <div class="step-block">
+              <h3>1. Fotky defektov</h3>
+              <p class="step-sub">Nahrajte fotky pre vybranú dávku (max. 30). Dajú sa kedykoľvek dopĺňať.</p>
+              <div class="dropzone" id="dropzone">
+                <div class="icon">&#8593;</div>
+                <strong>Kliknite pre výber fotiek</strong>
+                <span>alebo ich sem pretiahnite &mdash; JPG, PNG &middot; max. 30 ks</span>
+                <input type="file" id="file-input" accept="image/*" multiple>
+              </div>
+              <div class="row-between" style="margin-top:10px;">
+                <div class="status-line">Nahraných: <strong id="setup-count">0</strong> / 30</div>
+                <div class="status-line" id="setup-warning"></div>
+              </div>
+              <div class="thumb-grid" id="setup-thumb-grid"></div>
+            </div>
+
+            <div class="step-block">
+              <h3>2. Správne odpovede</h3>
+              <p class="step-sub" id="define-progress">Zatiaľ neboli nahrané žiadne fotky.</p>
+              <button class="btn btn-primary" id="btn-open-define" disabled>Definovať správne odpovede</button>
+              <div class="define-grid" id="define-grid"></div>
+            </div>
+
+            <div class="step-block">
+              <h3>Nebezpečná zóna</h3>
+              <p class="step-sub">Vymaže fotky, správne odpovede aj výsledky pre <strong>túto jednu dávku</strong> (ostatné dávky zostanú nedotknuté). Nedá sa vrátiť späť.</p>
+              <button class="btn btn-danger" id="btn-reset-all">Vymazať túto dávku</button>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- DEFINE CORRECT ANSWERS SUB-SCREEN -->
+        <div id="admin-define" class="admin-panel">
+          <div class="eval-status-row">
+            <div class="pos" id="d-eval-pos">Fotka 1 / 1</div>
+            <div class="filename" id="d-eval-filename"></div>
+            <button class="btn btn-ghost btn-sm" id="btn-define-done">Hotovo</button>
+          </div>
+          <div class="photo-stage">
+            <button class="stage-nav prev" id="d-btn-prev" aria-label="Predchádzajúca fotka">&#8592;</button>
+            <div class="stage-flag" id="d-stage-flag" style="display:none;"></div>
+            <img id="d-stage-img" src="" alt="Fotka defektu">
+            <button class="stage-nav next" id="d-btn-next" aria-label="Nasledujúca fotka">&#8594;</button>
+          </div>
+          <div class="verdict-row">
+            <button class="verdict-btn ok" data-def-verdict="OK">Správne: OK <span class="kb">1</span></button>
+            <button class="verdict-btn warn" data-def-verdict="HRANICNE">Správne: Hranične OK <span class="kb">2</span></button>
+            <button class="verdict-btn nok" data-def-verdict="NOK">Správne: NOK <span class="kb">3</span></button>
+          </div>
+          <div class="filmstrip-wrap"><div class="filmstrip" id="d-filmstrip"></div></div>
+        </div>
+
+        <!-- REPORTS PANEL -->
+        <div id="admin-reports" class="admin-panel">
+          <div class="admin-panel-wrap" style="max-width:980px;">
+
+            <div class="toolbar">
+              <div class="field">
+                <label for="report-batch-select">Zobraziť dávku</label>
+                <select id="report-batch-select"></select>
+              </div>
+              <div class="field" style="max-width:200px;">
+                <label for="report-archive-filter">Zobraziť</label>
+                <select id="report-archive-filter">
+                  <option value="active">Aktuálne (bez archívu)</option>
+                  <option value="archived">Iba archív</option>
+                  <option value="all">Všetko vrátane archívu</option>
+                </select>
+              </div>
+              <div class="field" style="max-width:160px;min-width:140px;">
+                <label for="report-date-from">Od</label>
+                <input type="date" id="report-date-from">
+              </div>
+              <div class="field" style="max-width:160px;min-width:140px;">
+                <label for="report-date-to">Do</label>
+                <input type="date" id="report-date-to">
+              </div>
+              <div class="field" style="max-width:220px;">
+                <label for="report-sort-select">Zoradiť podľa</label>
+                <select id="report-sort-select">
+                  <option value="score-asc">Skóre – najhoršie prvé</option>
+                  <option value="score-desc">Skóre – najlepšie prvé</option>
+                  <option value="date-desc">Dátum – najnovšie prvé</option>
+                  <option value="date-asc">Dátum – najstaršie prvé</option>
+                </select>
+              </div>
+              <div class="spacer"></div>
+              <button class="btn btn-ghost btn-sm" id="btn-export-agg-csv">Exportovať CSV</button>
+              <button class="btn btn-ghost btn-sm" id="btn-print-agg">Tlačiť súhrn</button>
+              <button class="btn btn-ghost btn-sm" id="btn-archive-shown">Archivovať zobrazené</button>
+              <button class="btn btn-ghost btn-sm" id="btn-restore-shown">Obnoviť z archívu</button>
+              <button class="btn btn-danger btn-sm" id="btn-clear-attempts">Vymazať výsledky</button>
+            </div>
+            <p class="step-sub" style="margin:-6px 0 14px 0;">Archivované testy sa nezapočítavajú do súhrnov ani do Dashboardu, kým ich znova neobnovíte. Vhodné napr. na vlastné skúšobné testy pri príprave.</p>
+
+            <div class="summary-row">
+              <div class="summary-card navy"><div class="num" id="agg-count">0</div><div class="lbl">Počet testov</div></div>
+              <div class="summary-card ok"><div class="num" id="agg-avg">0 %</div><div class="lbl">Priemerná úspešnosť</div></div>
+              <div class="summary-card ok"><div class="num" id="agg-best">&mdash;</div><div class="lbl">Najlepší výsledok</div></div>
+              <div class="summary-card nok"><div class="num" id="agg-worst">&mdash;</div><div class="lbl">Najslabší výsledok</div></div>
+            </div>
+
+            <table class="rtable">
+              <thead><tr><th>Operátor</th><th>Dávka</th><th>Dátum</th><th>Skóre</th><th>Úspešnosť</th><th></th></tr></thead>
+              <tbody id="attempts-tbody"></tbody>
+            </table>
+
+            <div class="section-gap" id="batch-overview-block">
+              <h3 style="font-size:14px;font-weight:600;margin:0 0 10px 0;">Prehľad podľa dávok</h3>
+              <table class="rtable">
+                <thead><tr><th>Dávka</th><th>Vytvorená</th><th>Fotiek</th><th>Testov</th><th>Priemerná úspešnosť</th><th>Stav</th></tr></thead>
+                <tbody id="batch-overview-tbody"></tbody>
+              </table>
+            </div>
+
+            <div class="section-gap" id="photo-stats-block" style="display:none;">
+              <h3 style="font-size:14px;font-weight:600;margin:0 0 10px 0;">Štatistika podľa fotky</h3>
+              <table class="rtable">
+                <thead><tr><th></th><th>Súbor</th><th>Správna odpoveď</th><th>Úspešnosť operátorov</th></tr></thead>
+                <tbody id="photo-stats-tbody"></tbody>
+              </table>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- DASHBOARD PANEL -->
+        <div id="admin-dashboard" class="admin-panel">
+          <div class="admin-panel-wrap" style="max-width:1280px;">
+
+            <div class="toolbar" style="margin-bottom:10px;">
+              <div class="field">
+                <label for="dash-area-select">Sekcia / projekt</label>
+                <select id="dash-area-select"></select>
+              </div>
+              <div class="field">
+                <label for="dash-operator-select">Operátor</label>
+                <select id="dash-operator-select"><option value="all">Všetci operátori (priemer)</option></select>
+              </div>
+              <div class="field" style="max-width:160px;min-width:140px;">
+                <label for="dash-date-from">Od</label>
+                <input type="date" id="dash-date-from">
+              </div>
+              <div class="field" style="max-width:160px;min-width:140px;">
+                <label for="dash-date-to">Do</label>
+                <input type="date" id="dash-date-to">
+              </div>
+            </div>
+            <p class="dash-card-sub" style="margin:-4px 0 14px 0;">Grafy a tabuľky potiahnutím za pravý dolný roh zväčšíte alebo zmenšíte.</p>
+
+            <div class="dash-row-top">
+              <div class="card dash-card dash-card-sm">
+                <div class="row-between" style="margin-bottom:4px;">
+                  <h3 class="dash-card-title" id="dash-chart-title">Vývoj úspešnosti v čase</h3>
+                  <div class="trend-pill" id="dash-trend-pill">
+                    <span class="trend-arrow" id="dash-trend-arrow">—</span>
+                    <span id="dash-trend-text"></span>
+                  </div>
+                </div>
+                <p class="dash-card-sub" style="margin:0 0 8px 0;">Čierna čiara = jednotlivé merania, prerušovaná farebná = trendová línia</p>
+                <div id="dash-chart-wrap" class="resizable-box" style="height:130px;"></div>
+                <div class="empty-state" id="dash-empty" style="display:none;">Zatiaľ žiadne dáta.</div>
+              </div>
+
+              <div class="card dash-card dash-card-sm">
+                <h3 class="dash-card-title">Spôsobilosť operátorov</h3>
+                <p class="dash-card-sub">100–90 % spôsobilý · 90–80 % podmienečne · pod 80 % nespôsobilý</p>
+                <div class="pie-layout">
+                  <div id="dash-pie-wrap" class="chart-pie"></div>
+                  <div id="dash-pie-legend" class="pie-legend"></div>
+                </div>
+              </div>
+
+              <div class="card dash-card dash-card-sm">
+                <h3 class="dash-card-title">Vyžaduje pozornosť / vzory</h3>
+                <p class="dash-card-sub">Najslabší (veľa testov) a najlepší operátori</p>
+                <div id="dash-highlights"></div>
+              </div>
+            </div>
+
+            <div class="dash-grid">
+              <div class="card dash-card">
+                <h3 class="dash-card-title">Porovnanie operátorov — úspešnosť</h3>
+                <div id="dash-bar-wrap" class="scroll-box"></div>
+                <div class="empty-state" id="dash-bar-empty" style="display:none;">Zatiaľ žiadne dáta.</div>
+              </div>
+              <div class="card dash-card">
+                <h3 class="dash-card-title">Počet testov × úspešnosť</h3>
+                <p class="dash-card-sub">Vpravo hore = dobrí a skúsení. Vpravo dole = veľa testov, stále zle.</p>
+                <div id="dash-scatter-wrap" class="resizable-box" style="height:300px;"></div>
+                <div class="empty-state" id="dash-scatter-empty" style="display:none;">Zatiaľ žiadne dáta.</div>
+              </div>
+            </div>
+
+            <div class="card dash-card">
+              <h3 class="dash-card-title">Matica spôsobilosti operátorov</h3>
+              <p class="dash-card-sub">100–90 % = spôsobilý · 90–80 % = podmienečne spôsobilý · pod 80 % = nespôsobilý</p>
+              <div class="scroll-box" style="height:200px;">
+                <table class="rtable" id="dash-matrix-table">
+                  <thead><tr><th>Operátor</th><th>Úspešnosť</th><th>Testov</th><th>Spôsobilosť</th><th>Odporúčanie</th></tr></thead>
+                  <tbody id="dash-matrix-tbody"></tbody>
+                </table>
+              </div>
+              <div class="empty-state" id="dash-matrix-empty" style="display:none;">Zatiaľ žiadne dáta.</div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ATTEMPT DETAIL -->
+        <div id="admin-attempt-detail" class="admin-panel">
+          <div class="result-wrap">
+            <div class="toolbar">
+              <button class="btn btn-ghost btn-sm" id="btn-detail-back">&#8592; Späť na reporty</button>
+              <button class="btn btn-ghost btn-sm" id="btn-print-detail">Tlačiť tento report</button>
+            </div>
+            <div class="score-hero">
+              <div class="op-name" id="det-op-name"></div>
+              <div class="big-pct" id="det-pct">0 %</div>
+              <div class="frac" id="det-frac"></div>
+              <div class="when" id="det-when"></div>
+            </div>
+            <table class="rtable">
+              <thead><tr><th>#</th><th></th><th>Súbor</th><th>Odpoveď operátora</th><th>Správna odpoveď</th><th>Zhoda</th><th>Poznámka</th></tr></thead>
+              <tbody id="detail-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+    </section>
+
+  </main>
+</div>
+
+<div class="lightbox" id="lightbox" style="display:none;">
+  <button class="lb-close" id="lb-close" aria-label="Zavrieť" type="button">&times;</button>
+  <button class="lb-nav prev" id="lb-prev" aria-label="Predchádzajúca">&#8592;</button>
+  <div class="lb-body">
+    <img id="lb-img" src="" alt="">
+    <div class="lb-meta">
+      <div class="lb-name" id="lb-name"></div>
+      <div class="lb-badges" id="lb-badges"></div>
+      <div class="lb-note" id="lb-note"></div>
+    </div>
+  </div>
+  <button class="lb-nav next" id="lb-next" aria-label="Nasledujúca">&#8594;</button>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  /* =========================================================
+     CONSTANTS
+  ========================================================= */
+  var MAX_PHOTOS = 30;
+  var VERDICT_LABEL = { OK:'OK', HRANICNE:'Hranične OK', NOK:'NOK' };
+  var VERDICT_CLASS = { OK:'ok', HRANICNE:'warn', NOK:'nok' };
+  var VERDICT_COLOR = { ok:'#1F7A54', warn:'#96650A', nok:'#AE2E22' };
+
+  /* =========================================================
+     INDEXEDDB LAYER
+  ========================================================= */
+  function showStorageWarning(msg){
+    var el = document.getElementById('storage-banner');
+    var textEl = document.getElementById('storage-banner-text');
+    if(!el || !textEl) return;
+    textEl.textContent = msg;
+    el.style.display = 'flex';
+  }
+  var storageBannerClose = document.getElementById('storage-banner-close');
+  if(storageBannerClose){
+    storageBannerClose.addEventListener('click', function(){ document.getElementById('storage-banner').style.display='none'; });
+  }
+  window.addEventListener('unhandledrejection', function(event){
+    console.error('Nezachytená chyba:', event.reason);
+    var msg = (event.reason && event.reason.message) ? event.reason.message : String(event.reason);
+    showStorageWarning('Nastala chyba pri práci s dátami (' + msg + '). Skúste obnoviť stránku. Ak to pretrváva, prehliadač pravdepodobne blokuje lokálne úložisko (IndexedDB) — skúste iný prehliadač alebo vypnite prísne blokovanie súkromia/sledovania pre tento súbor.');
+  });
+
+  var DB_NAME = 'qc-defekt-test-db';
+  var DB_VERSION = 3;
+  var dbPromise = new Promise(function(resolve, reject){
+    if(!window.indexedDB){
+      var e = new Error('IndexedDB nie je dostupné v tomto prehliadači/režime.');
+      showStorageWarning('Tento prehliadač alebo režim (napr. prísne súkromné prehliadanie, firemná politika) blokuje lokálne úložisko potrebné na uloženie fotiek a výsledkov. Skúste iný prehliadač (napr. Chrome) alebo bežné okno (nie InPrivate).');
+      reject(e);
+      return;
+    }
+    try{
+      var req = indexedDB.open(DB_NAME, DB_VERSION);
+      req.onupgradeneeded = function(e){
+        var db = e.target.result;
+        if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv', {keyPath:'key'});
+        if(!db.objectStoreNames.contains('photos')) db.createObjectStore('photos', {keyPath:'id'});
+        if(!db.objectStoreNames.contains('attempts')) db.createObjectStore('attempts', {keyPath:'id', autoIncrement:true});
+        if(!db.objectStoreNames.contains('batches')) db.createObjectStore('batches', {keyPath:'id'});
+        if(!db.objectStoreNames.contains('areas')) db.createObjectStore('areas', {keyPath:'id'});
+      };
+      req.onsuccess = function(e){ resolve(e.target.result); };
+      req.onerror = function(e){ reject(e.target.error || new Error('Chyba pri otváraní databázy')); };
+      req.onblocked = function(){
+        showStorageWarning('Databáza je blokovaná iným otvoreným oknom/kartou s touto appkou. Zatvorte ostatné karty s "Hodnotenie defektov" a obnovte túto stránku.');
+      };
+    }catch(err){ reject(err); }
+  });
+
+  function idbTx(store, mode){ return dbPromise.then(function(db){ return db.transaction([store], mode||'readonly'); }); }
+  function idbPut(store, val){
+    return idbTx(store,'readwrite').then(function(t){ return new Promise(function(res,rej){
+      var r = t.objectStore(store).put(val);
+      r.onsuccess = function(){ res(r.result); };
+      r.onerror = function(){ rej(r.error); };
+    }); });
+  }
+  function idbGet(store, key){
+    return idbTx(store).then(function(t){ return new Promise(function(res,rej){
+      var r = t.objectStore(store).get(key);
+      r.onsuccess = function(){ res(r.result); };
+      r.onerror = function(){ rej(r.error); };
+    }); });
+  }
+  function idbGetAll(store){
+    return idbTx(store).then(function(t){ return new Promise(function(res,rej){
+      var r = t.objectStore(store).getAll();
+      r.onsuccess = function(){ res(r.result || []); };
+      r.onerror = function(){ rej(r.error); };
+    }); });
+  }
+  function idbDeleteKey(store, key){
+    return idbTx(store,'readwrite').then(function(t){ return new Promise(function(res,rej){
+      var r = t.objectStore(store).delete(key);
+      r.onsuccess = function(){ res(); };
+      r.onerror = function(){ rej(r.error); };
+    }); });
+  }
+  function idbClear(store){
+    return idbTx(store,'readwrite').then(function(t){ return new Promise(function(res,rej){
+      var r = t.objectStore(store).clear();
+      r.onsuccess = function(){ res(); };
+      r.onerror = function(){ rej(r.error); };
+    }); });
+  }
+
+  /* =========================================================
+     PASSWORD HASHING (deterrent-level, not real security)
+  ========================================================= */
+  function randomSalt(){
+    if(window.crypto && crypto.getRandomValues){
+      var arr = new Uint8Array(16); crypto.getRandomValues(arr);
+      return Array.prototype.map.call(arr, function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+    }
+    return Math.random().toString(16).slice(2) + Date.now().toString(16);
+  }
+  function fallbackHash(str){
+    var h1=0x811c9dc5, h2=0x811c9dc5;
+    for(var i=0;i<str.length;i++){
+      var c=str.charCodeAt(i);
+      h1=(h1^c)>>>0; h1=Math.imul(h1,16777619)>>>0;
+      h2=(h2^(c<<3))>>>0; h2=Math.imul(h2,2246822519)>>>0;
+    }
+    return h1.toString(16)+h2.toString(16);
+  }
+  function hashPassword(password, salt){
+    var input = salt + '::' + password;
+    if(window.crypto && window.crypto.subtle){
+      var enc = new TextEncoder().encode(input);
+      return crypto.subtle.digest('SHA-256', enc).then(function(digest){
+        return Array.prototype.map.call(new Uint8Array(digest), function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+      }).catch(function(){ return fallbackHash(input); });
+    }
+    return Promise.resolve(fallbackHash(input));
+  }
+
+  /* =========================================================
+     STATE
+  ========================================================= */
+  var allBatches = [];        // {id, label, createdAt, areaId}
+  var allAreas = [];          // {id, label, createdAt}
+  var activeBatchId = null;   // batch served to operators
+  var editingBatchId = null;  // batch currently shown in Setup
+  var photosCache = {};       // batchId -> [{id,name,blob,url,correctAnswer,order,batchId}]
+  var editingPhotos = [];
+  var activePhotos = [];
+
+  var adminAuthHash = null;
+  var adminAuthed = false;
+
+  var currentAttempt = null;
+  var defineIndex = 0;
+  var attemptsCache = [];
+  var currentDetailAttempt = null;
+
+  var lightboxAnswers = [];   // current attempt's answers, for lightbox nav
+  var lightboxPhotos = [];    // photos for the batch of the open attempt
+  var lightboxIndex = 0;
+  var lightboxShowCorrect = true; // whether to reveal the correct answer (admin view) or not (operator's own view)
+  var lightboxGivenLabel = 'Operátor: ';
+
+  function genId(){ return 'id' + Date.now() + Math.random().toString(16).slice(2); }
+  function currentBatchLabel(id){ var b = allBatches.find(function(x){ return x.id===id; }); return b ? b.label : '—'; }
+  function currentAreaLabel(id){ if(!id) return 'Bez sekcie'; var a = allAreas.find(function(x){ return x.id===id; }); return a ? a.label : 'Bez sekcie'; }
+
+  /* =========================================================
+     ELEMENTS
+  ========================================================= */
+  var modes = { test: document.getElementById('mode-test'), admin: document.getElementById('mode-admin') };
+  var navTest = document.getElementById('nav-test');
+  var navAdmin = document.getElementById('nav-admin');
+  var topbarMeta = document.getElementById('topbar-meta');
+
+  var screensTest = {
+    empty: document.getElementById('screen-test-empty'),
+    start: document.getElementById('screen-test-start'),
+    eval: document.getElementById('screen-test-eval'),
+    result: document.getElementById('screen-test-result')
+  };
+  function showTestScreen(name){
+    Object.keys(screensTest).forEach(function(k){ screensTest[k].classList.toggle('is-active', k===name); });
+  }
+
+  navTest.addEventListener('click', function(){ switchMode('test'); });
+  navAdmin.addEventListener('click', function(){ switchMode('admin'); });
+
+  function switchMode(name){
+    modes.test.classList.toggle('is-active', name==='test');
+    modes.admin.classList.toggle('is-active', name==='admin');
+    navTest.classList.toggle('is-active', name==='test');
+    navAdmin.classList.toggle('is-active', name==='admin');
+    if(name==='admin') renderAdminGateOrShell();
+    if(name==='test') refreshTestModeEntry();
+  }
+
+  /* =========================================================
+     PHOTO CACHE HELPERS
+  ========================================================= */
+  function getPhotosForBatch(batchId){
+    if(!batchId) return Promise.resolve([]);
+    if(photosCache[batchId]) return Promise.resolve(photosCache[batchId]);
+    return idbGetAll('photos').then(function(all){
+      var list = all.filter(function(p){ return p.batchId===batchId; }).sort(function(a,b){ return a.order-b.order; });
+      list.forEach(function(p){ p.url = URL.createObjectURL(p.blob); });
+      photosCache[batchId] = list;
+      return list;
+    });
+  }
+
+  /* =========================================================
+     INIT + LEGACY MIGRATION (v1 -> batches)
+  ========================================================= */
+  function ensureBatchesExist(){
+    return idbGetAll('batches').then(function(batches){
+      if(batches.length>0){ allBatches = batches; return; }
+      return Promise.all([idbGetAll('photos'), idbGetAll('attempts'), idbGet('kv','testMeta')]).then(function(res){
+        var legacyPhotos = res[0]||[], legacyAttempts = res[1]||[], legacyMeta = res[2];
+        var hasLegacy = legacyPhotos.some(function(p){ return !p.batchId; }) || legacyAttempts.some(function(a){ return !a.batchId; });
+        if(!hasLegacy){
+          var fresh = { id:genId(), label:'Dávka 1', createdAt:new Date() };
+          return idbPut('batches', fresh).then(function(){
+            allBatches=[fresh];
+          });
+        }
+        var legacyBatch = { id:genId(), label:(legacyMeta && legacyMeta.batch) || 'Dávka 1', createdAt:new Date() };
+        var puts = [];
+        legacyPhotos.forEach(function(p){ if(!p.batchId){ p.batchId = legacyBatch.id; puts.push(idbPut('photos', p)); } });
+        legacyAttempts.forEach(function(a){ if(!a.batchId){ a.batchId = legacyBatch.id; a.batchLabel = legacyBatch.label; puts.push(idbPut('attempts', a)); } });
+        return idbPut('batches', legacyBatch).then(function(){ return Promise.all(puts); })
+          .then(function(){ return idbPut('kv', {key:'activeBatchId', value:legacyBatch.id}); })
+          .then(function(){ allBatches=[legacyBatch]; });
+      });
+    });
+  }
+
+  function init(){
+    idbGet('kv','adminAuth').then(function(rec){
+      adminAuthHash = rec || null;
+      return ensureBatchesExist();
+    }).then(function(){
+      return idbGetAll('areas');
+    }).then(function(areas){
+      allAreas = areas || [];
+      return idbGet('kv','activeBatchId');
+    }).then(function(rec){
+      activeBatchId = rec ? rec.value : (allBatches[0] ? allBatches[0].id : null);
+      if(activeBatchId && !allBatches.some(function(b){ return b.id===activeBatchId; })) activeBatchId = allBatches[0] ? allBatches[0].id : null;
+      editingBatchId = activeBatchId || (allBatches[0] ? allBatches[0].id : null);
+      return Promise.all([getPhotosForBatch(editingBatchId), getPhotosForBatch(activeBatchId)]);
+    }).then(function(res){
+      editingPhotos = res[0];
+      activePhotos = (activeBatchId===editingBatchId) ? editingPhotos : res[1];
+      refreshBatchSelectors();
+      renderSetupState();
+      refreshTestModeEntry();
+    }).catch(function(err){
+      console.error('Chyba pri inicializácii databázy', err);
+      showStorageWarning('Appku sa nepodarilo spustiť správne (' + (err && err.message ? err.message : err) + '). Skúste obnoviť stránku alebo iný prehliadač (napr. Chrome, nie súkromné/InPrivate okno).');
+    });
+  }
+
+  /* =========================================================
+     BATCH SELECTORS
+  ========================================================= */
+  var batchSelect = document.getElementById('batch-select');
+  var reportBatchSelect = document.getElementById('report-batch-select');
+  var fieldBatchLabel = document.getElementById('field-batch-label');
+  var btnNewBatch = document.getElementById('btn-new-batch');
+  var btnActivateBatch = document.getElementById('btn-activate-batch');
+  var activeBatchIndicator = document.getElementById('active-batch-indicator');
+  var areaSelect = document.getElementById('area-select');
+  var btnNewArea = document.getElementById('btn-new-area');
+
+  function sortedBatches(){
+    return allBatches.slice().sort(function(a,b){ return new Date(b.createdAt) - new Date(a.createdAt); });
+  }
+  function sortedAreas(){
+    return allAreas.slice().sort(function(a,b){ return a.label.localeCompare(b.label, 'sk'); });
+  }
+
+  function refreshBatchSelectors(){
+    var editingBatch = allBatches.find(function(b){ return b.id===editingBatchId; });
+
+    areaSelect.innerHTML = '';
+    var optNone = document.createElement('option'); optNone.value=''; optNone.textContent='Bez sekcie';
+    areaSelect.appendChild(optNone);
+    sortedAreas().forEach(function(a){
+      var opt=document.createElement('option'); opt.value=a.id; opt.textContent=a.label;
+      areaSelect.appendChild(opt);
+    });
+    areaSelect.value = (editingBatch && editingBatch.areaId) ? editingBatch.areaId : '';
+
+    batchSelect.innerHTML = '';
+    sortedBatches().forEach(function(b){
+      var opt = document.createElement('option');
+      opt.value = b.id;
+      opt.textContent = b.label + (b.id===activeBatchId ? ' (aktívna)' : '');
+      batchSelect.appendChild(opt);
+    });
+    if(editingBatchId) batchSelect.value = editingBatchId;
+
+    var prevVal = reportBatchSelect.value || 'all';
+    reportBatchSelect.innerHTML = '';
+    var optAll = document.createElement('option'); optAll.value='all'; optAll.textContent='Všetky dávky (celkový prehľad)';
+    reportBatchSelect.appendChild(optAll);
+    sortedBatches().forEach(function(b){
+      var opt=document.createElement('option'); opt.value=b.id; opt.textContent=b.label;
+      reportBatchSelect.appendChild(opt);
+    });
+    var stillValid = Array.prototype.some.call(reportBatchSelect.options, function(o){ return o.value===prevVal; });
+    reportBatchSelect.value = stillValid ? prevVal : 'all';
+
+    fieldBatchLabel.value = editingBatchId ? currentBatchLabel(editingBatchId) : '';
+    btnActivateBatch.disabled = !editingBatchId || editingBatchId===activeBatchId;
+    activeBatchIndicator.innerHTML = activeBatchId
+      ? ('Aktívna pre operátorov: <strong>' + escapeHtml(currentBatchLabel(activeBatchId)) + '</strong>')
+      : 'Zatiaľ nie je nastavená žiadna aktívna dávka pre operátorov.';
+    topbarMeta.textContent = activeBatchId ? currentBatchLabel(activeBatchId) : '';
+
+    refreshDashboardFilters();
+  }
+
+  areaSelect.addEventListener('change', function(){
+    var b = allBatches.find(function(x){ return x.id===editingBatchId; });
+    if(!b) return;
+    b.areaId = areaSelect.value || null;
+    idbPut('batches', b).then(function(){ refreshBatchSelectors(); });
+  });
+
+  btnNewArea.addEventListener('click', function(){
+    var label = prompt('Názov novej sekcie / projektu (napr. "Dvere W177"):', '');
+    if(label===null || !label.trim()) return;
+    var area = { id:genId(), label:label.trim(), createdAt:new Date() };
+    idbPut('areas', area).then(function(){
+      allAreas.push(area);
+      var b = allBatches.find(function(x){ return x.id===editingBatchId; });
+      if(b){ b.areaId = area.id; return idbPut('batches', b); }
+    }).then(function(){ refreshBatchSelectors(); });
+  });
+
+  batchSelect.addEventListener('change', function(){
+    editingBatchId = batchSelect.value;
+    getPhotosForBatch(editingBatchId).then(function(photos){
+      editingPhotos = photos;
+      renderSetupState();
+      refreshBatchSelectors();
+    });
+  });
+
+  fieldBatchLabel.addEventListener('change', function(){
+    var b = allBatches.find(function(x){ return x.id===editingBatchId; });
+    if(!b) return;
+    b.label = fieldBatchLabel.value.trim() || b.label;
+    idbPut('batches', b).then(function(){ refreshBatchSelectors(); });
+  });
+
+  btnNewBatch.addEventListener('click', function(){
+    var label = prompt('Názov novej dávky (napr. projekt alebo číslo šarže):', '');
+    if(label===null) return;
+    var currentAreaId = (allBatches.find(function(x){ return x.id===editingBatchId; })||{}).areaId || null;
+    var batch = { id:genId(), label: label.trim() || ('Dávka ' + (allBatches.length+1)), createdAt:new Date(), areaId: currentAreaId };
+    idbPut('batches', batch).then(function(){
+      allBatches.push(batch);
+      photosCache[batch.id] = [];
+      editingBatchId = batch.id;
+      editingPhotos = photosCache[batch.id]; // same array reference, so uploads stay in sync with the cache
+      renderSetupState();
+      refreshBatchSelectors();
+    });
+  });
+
+  btnActivateBatch.addEventListener('click', function(){
+    if(!editingBatchId) return;
+    activeBatchId = editingBatchId;
+    idbPut('kv', {key:'activeBatchId', value:activeBatchId}).then(function(){
+      return getPhotosForBatch(activeBatchId);
+    }).then(function(photos){
+      activePhotos = photos;
+      refreshBatchSelectors();
+      refreshTestModeEntry();
+    });
+  });
+
+  /* =========================================================
+     SEQUENTIAL, MEMORY-SAFE PHOTO LOADER
+  ========================================================= */
+  ['dragover','drop'].forEach(function(evt){
+    window.addEventListener(evt, function(e){ e.preventDefault(); }, false);
+  });
+
+  var dropzone = document.getElementById('dropzone');
+  var fileInput = document.getElementById('file-input');
+  var setupCountEl = document.getElementById('setup-count');
+  var setupWarningEl = document.getElementById('setup-warning');
+  var setupThumbGrid = document.getElementById('setup-thumb-grid');
+  var isLoadingPhotos = false;
+
+  dropzone.addEventListener('click', function(){ if(!isLoadingPhotos && editingBatchId) fileInput.click(); });
+  dropzone.addEventListener('dragover', function(e){ e.preventDefault(); dropzone.classList.add('is-drag'); });
+  dropzone.addEventListener('dragleave', function(){ dropzone.classList.remove('is-drag'); });
+  dropzone.addEventListener('drop', function(e){
+    e.preventDefault(); dropzone.classList.remove('is-drag');
+    if(editingBatchId) handleFiles(e.dataTransfer.files);
+  });
+  fileInput.addEventListener('change', function(e){ handleFiles(e.target.files); fileInput.value=''; });
+
+  function handleFiles(fileList){
+    if(isLoadingPhotos || !editingBatchId) return;
+    var files = Array.prototype.slice.call(fileList).filter(function(f){ return f.type.indexOf('image/')===0; });
+    if(files.length===0) return;
+    var room = MAX_PHOTOS - editingPhotos.length;
+    var overflow = files.length > room;
+    var toLoad = files.slice(0, Math.max(room,0));
+    setupWarningEl.textContent = overflow
+      ? ('Načítaných bolo len prvých ' + Math.min(files.length, MAX_PHOTOS) + ' z ' + files.length + ' vybraných (limit ' + MAX_PHOTOS + ').')
+      : '';
+    loadQueueSequentially(toLoad);
+  }
+
+  function loadQueueSequentially(files){
+    if(files.length===0) return;
+    isLoadingPhotos = true;
+    dropzone.classList.add('is-loading');
+    var i=0;
+    function next(){
+      if(i>=files.length){ isLoadingPhotos=false; dropzone.classList.remove('is-loading'); setProgressText(''); return; }
+      setProgressText('Spracúvam fotku ' + (i+1) + ' / ' + files.length + ' …');
+      loadAndResize(files[i]).then(function(){ i++; next(); })
+        .catch(function(err){ console.error('Chyba pri načítaní fotky', files[i] && files[i].name, err); i++; next(); });
+    }
+    next();
+  }
+  function setProgressText(text){
+    var host = setupCountEl.parentElement;
+    var existing = host.querySelector('.progress-text');
+    if(existing) existing.remove();
+    if(text){ var span=document.createElement('span'); span.className='progress-text'; span.style.marginLeft='10px'; span.textContent=text; host.appendChild(span); }
+  }
+
+  function loadAndResize(file){
+    return new Promise(function(resolve, reject){
+      var maxDim = 1400;
+      function drawAndStore(source, w, h){
+        try{
+          var scale = Math.min(1, maxDim/Math.max(w,h));
+          var canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(w*scale));
+          canvas.height = Math.max(1, Math.round(h*scale));
+          var ctx = canvas.getContext('2d');
+          ctx.drawImage(source, 0, 0, canvas.width, canvas.height);
+          if(source.close) source.close();
+          canvas.toBlob(function(blob){
+            if(!blob){ reject(new Error('toBlob failed')); return; }
+            addPhotoRecord(file.name, blob).then(resolve).catch(reject);
+          }, 'image/jpeg', 0.82);
+        }catch(err){ reject(err); }
+      }
+      if(window.createImageBitmap){
+        createImageBitmap(file).then(function(bitmap){ drawAndStore(bitmap, bitmap.width, bitmap.height); }).catch(loadViaImageElement);
+      } else { loadViaImageElement(); }
+      function loadViaImageElement(){
+        var objectUrl = URL.createObjectURL(file);
+        var img = new Image();
+        img.onload = function(){ drawAndStore(img, img.naturalWidth, img.naturalHeight); URL.revokeObjectURL(objectUrl); };
+        img.onerror = function(err){ URL.revokeObjectURL(objectUrl); reject(err || new Error('image load failed')); };
+        img.src = objectUrl;
+      }
+    });
+  }
+
+  function addPhotoRecord(name, blob){
+    var record = { id:genId(), name:name, blob:blob, correctAnswer:null, order:editingPhotos.length, batchId:editingBatchId };
+    return idbPut('photos', record).then(function(){
+      record.url = URL.createObjectURL(blob);
+      editingPhotos.push(record);
+      renderSetupState();
+      if(activeBatchId===editingBatchId) refreshTestModeEntry();
+    });
+  }
+
+  /* =========================================================
+     ADMIN: SETUP PANEL
+  ========================================================= */
+  var defineProgressEl = document.getElementById('define-progress');
+  var btnOpenDefine = document.getElementById('btn-open-define');
+  var defineGrid = document.getElementById('define-grid');
+
+  function renderSetupState(){
+    dropzone.classList.toggle('is-disabled', !editingBatchId);
+    setupCountEl.textContent = editingPhotos.length;
+    setupThumbGrid.innerHTML = '';
+    editingPhotos.forEach(function(p){
+      var img=document.createElement('img'); img.src=p.url; img.alt=p.name;
+      setupThumbGrid.appendChild(img);
+    });
+
+    var defined = editingPhotos.filter(function(p){ return p.correctAnswer; }).length;
+    if(editingPhotos.length===0){
+      defineProgressEl.textContent = 'Zatiaľ neboli nahrané žiadne fotky.';
+      btnOpenDefine.disabled = true;
+    } else {
+      defineProgressEl.textContent = 'Definovaných ' + defined + ' / ' + editingPhotos.length + ' fotiek.';
+      btnOpenDefine.disabled = false;
+    }
+
+    defineGrid.innerHTML = '';
+    editingPhotos.forEach(function(p, idx){
+      var tile=document.createElement('div');
+      tile.className='define-tile status-'+(p.correctAnswer?VERDICT_CLASS[p.correctAnswer]:'pending');
+      var img=document.createElement('img'); img.src=p.url; img.alt=p.name;
+      tile.appendChild(img);
+      tile.addEventListener('click', function(){ openDefineScreen(idx); });
+      defineGrid.appendChild(tile);
+    });
+  }
+
+  document.getElementById('btn-reset-all').addEventListener('click', function(){
+    if(!editingBatchId) return;
+    var label = currentBatchLabel(editingBatchId);
+    if(!confirm('Naozaj vymazať dávku "' + label + '" (fotky, správne odpovede aj všetky jej výsledky)? Túto akciu nie je možné vrátiť späť.')) return;
+    var idToDelete = editingBatchId;
+    Promise.all([idbGetAll('photos'), idbGetAll('attempts')]).then(function(res){
+      var photos = res[0].filter(function(p){ return p.batchId===idToDelete; });
+      var attempts = res[1].filter(function(a){ return a.batchId===idToDelete; });
+      var dels = photos.map(function(p){ return idbDeleteKey('photos', p.id); })
+        .concat(attempts.map(function(a){ return idbDeleteKey('attempts', a.id); }));
+      return Promise.all(dels);
+    }).then(function(){ return idbDeleteKey('batches', idToDelete); })
+    .then(function(){
+      allBatches = allBatches.filter(function(b){ return b.id!==idToDelete; });
+      delete photosCache[idToDelete];
+      if(activeBatchId===idToDelete){
+        activeBatchId = allBatches[0] ? allBatches[0].id : null;
+        idbPut('kv', {key:'activeBatchId', value:activeBatchId});
+      }
+      editingBatchId = allBatches[0] ? allBatches[0].id : null;
+      return getPhotosForBatch(editingBatchId);
+    }).then(function(photos){
+      editingPhotos = photos;
+      activePhotos = (activeBatchId===editingBatchId) ? editingPhotos : activePhotos;
+      refreshBatchSelectors();
+      renderSetupState();
+      refreshTestModeEntry();
+    });
+  });
+
+  /* =========================================================
+     ADMIN: DEFINE CORRECT ANSWERS
+  ========================================================= */
+  var atabSetup = document.getElementById('atab-setup');
+  var atabReports = document.getElementById('atab-reports');
+  var atabDashboard = document.getElementById('atab-dashboard');
+  var adminPanels = {
+    setup: document.getElementById('admin-setup'),
+    define: document.getElementById('admin-define'),
+    reports: document.getElementById('admin-reports'),
+    dashboard: document.getElementById('admin-dashboard'),
+    detail: document.getElementById('admin-attempt-detail')
+  };
+  function showAdminPanel(name){
+    Object.keys(adminPanels).forEach(function(k){ adminPanels[k].classList.toggle('is-active', k===name); });
+    atabSetup.classList.toggle('is-active', name==='setup'||name==='define');
+    atabReports.classList.toggle('is-active', name==='reports'||name==='detail');
+    atabDashboard.classList.toggle('is-active', name==='dashboard');
+  }
+  atabSetup.addEventListener('click', function(){ showAdminPanel('setup'); });
+  atabReports.addEventListener('click', function(){ showAdminPanel('reports'); renderReportsPanel(); });
+  atabDashboard.addEventListener('click', function(){ showAdminPanel('dashboard'); renderDashboard(); });
+  reportBatchSelect.addEventListener('change', renderReportsPanel);
+  document.getElementById('report-date-from').addEventListener('change', renderReportsPanel);
+  document.getElementById('report-date-to').addEventListener('change', renderReportsPanel);
+  document.getElementById('report-sort-select').addEventListener('change', renderReportsPanel);
+  document.getElementById('report-archive-filter').addEventListener('change', renderReportsPanel);
+
+  document.getElementById('btn-open-define').addEventListener('click', function(){ openDefineScreen(0); });
+  document.getElementById('btn-define-done').addEventListener('click', function(){ showAdminPanel('setup'); renderSetupState(); });
+
+  var dEvalPos=document.getElementById('d-eval-pos'), dEvalFilename=document.getElementById('d-eval-filename');
+  var dStageImg=document.getElementById('d-stage-img'), dStageFlag=document.getElementById('d-stage-flag');
+  var dBtnPrev=document.getElementById('d-btn-prev'), dBtnNext=document.getElementById('d-btn-next');
+  var dFilmstrip=document.getElementById('d-filmstrip');
+  var defineVerdictBtns=document.querySelectorAll('[data-def-verdict]');
+
+  function openDefineScreen(idx){
+    if(editingPhotos.length===0) return;
+    defineIndex = Math.max(0, Math.min(idx, editingPhotos.length-1));
+    showAdminPanel('define');
+    renderDefineScreen();
+  }
+  function renderDefineScreen(){
+    var p = editingPhotos[defineIndex];
+    dEvalPos.textContent = 'Fotka ' + (defineIndex+1) + ' / ' + editingPhotos.length;
+    dEvalFilename.textContent = p.name;
+    dStageImg.src = p.url; dStageImg.alt = p.name;
+    dBtnPrev.disabled = defineIndex===0;
+    dBtnNext.disabled = defineIndex===editingPhotos.length-1;
+
+    defineVerdictBtns.forEach(function(btn){ btn.classList.toggle('is-selected', p.correctAnswer===btn.getAttribute('data-def-verdict')); });
+    if(p.correctAnswer){
+      dStageFlag.style.display='inline-block';
+      dStageFlag.textContent = 'Správne: ' + VERDICT_LABEL[p.correctAnswer];
+      dStageFlag.style.background = VERDICT_COLOR[VERDICT_CLASS[p.correctAnswer]];
+    } else { dStageFlag.style.display='none'; }
+
+    dFilmstrip.innerHTML='';
+    editingPhotos.forEach(function(ph,i){
+      var item=document.createElement('div'); item.className='film-item';
+      if(i===defineIndex) item.classList.add('is-current');
+      if(ph.correctAnswer) item.classList.add('status-'+VERDICT_CLASS[ph.correctAnswer]);
+      var img=document.createElement('img'); img.src=ph.url; img.alt=ph.name;
+      item.appendChild(img);
+      item.addEventListener('click', function(){ defineIndex=i; renderDefineScreen(); });
+      dFilmstrip.appendChild(item);
+    });
+    var cur = dFilmstrip.children[defineIndex];
+    if(cur && cur.scrollIntoView) cur.scrollIntoView({inline:'center', block:'nearest'});
+  }
+  dBtnPrev.addEventListener('click', function(){ if(defineIndex>0){ defineIndex--; renderDefineScreen(); } });
+  dBtnNext.addEventListener('click', function(){ if(defineIndex<editingPhotos.length-1){ defineIndex++; renderDefineScreen(); } });
+  defineVerdictBtns.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var v = btn.getAttribute('data-def-verdict');
+      var p = editingPhotos[defineIndex];
+      p.correctAnswer = v;
+      idbPut('photos', { id:p.id, name:p.name, blob:p.blob, correctAnswer:p.correctAnswer, order:p.order, batchId:p.batchId });
+      if(defineIndex < editingPhotos.length-1) defineIndex++;
+      renderDefineScreen();
+    });
+  });
+  document.addEventListener('keydown', function(e){
+    if(!adminPanels.define.classList.contains('is-active')) return;
+    var tag=document.activeElement.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA') return;
+    if(e.key==='1') defineVerdictBtns[0].click();
+    else if(e.key==='2') defineVerdictBtns[1].click();
+    else if(e.key==='3') defineVerdictBtns[2].click();
+    else if(e.key==='ArrowLeft') dBtnPrev.click();
+    else if(e.key==='ArrowRight') dBtnNext.click();
+  });
+
+  /* =========================================================
+     ADMIN GATE
+  ========================================================= */
+  var screenGate=document.getElementById('screen-admin-gate'), adminShell=document.getElementById('admin-shell');
+  var gateSetpass=document.getElementById('gate-setpass'), gateLogin=document.getElementById('gate-login');
+
+  function renderAdminGateOrShell(){
+    if(adminAuthed){
+      screenGate.classList.remove('is-active');
+      adminShell.classList.add('is-active');
+      showAdminPanel('setup');
+    } else {
+      adminShell.classList.remove('is-active');
+      screenGate.classList.add('is-active');
+      if(adminAuthHash){
+        gateSetpass.style.display='none'; gateLogin.style.display='block';
+        document.getElementById('field-loginpass').value='';
+        document.getElementById('login-error').style.display='none';
+      } else {
+        gateSetpass.style.display='block'; gateLogin.style.display='none';
+        document.getElementById('field-newpass1').value='';
+        document.getElementById('field-newpass2').value='';
+        document.getElementById('setpass-error').style.display='none';
+      }
+    }
+  }
+
+  document.getElementById('btn-set-password').addEventListener('click', function(){
+    var p1=document.getElementById('field-newpass1').value, p2=document.getElementById('field-newpass2').value;
+    var errEl=document.getElementById('setpass-error');
+    if(p1.length<4){ errEl.textContent='Heslo musí mať aspoň 4 znaky.'; errEl.style.display='block'; return; }
+    if(p1!==p2){ errEl.textContent='Heslá sa nezhodujú.'; errEl.style.display='block'; return; }
+    var salt=randomSalt();
+    hashPassword(p1,salt).then(function(hash){
+      var rec={key:'adminAuth', hash:hash, salt:salt};
+      return idbPut('kv',rec).then(function(){ adminAuthHash=rec; adminAuthed=true; renderAdminGateOrShell(); });
+    }).catch(function(err){
+      errEl.textContent = 'Nepodarilo sa uložiť heslo (' + (err && err.message ? err.message : err) + '). Prehliadač pravdepodobne blokuje lokálne úložisko — skúste iný prehliadač alebo bežné (nie súkromné) okno.';
+      errEl.style.display='block';
+    });
+  });
+
+  document.getElementById('btn-login').addEventListener('click', attemptLogin);
+  document.getElementById('field-loginpass').addEventListener('keydown', function(e){ if(e.key==='Enter') attemptLogin(); });
+  function attemptLogin(){
+    var pass=document.getElementById('field-loginpass').value;
+    hashPassword(pass, adminAuthHash.salt).then(function(hash){
+      if(hash===adminAuthHash.hash){ adminAuthed=true; renderAdminGateOrShell(); }
+      else {
+        var errEl = document.getElementById('login-error');
+        errEl.textContent = 'Nesprávne heslo.';
+        errEl.style.display='block';
+      }
+    }).catch(function(err){
+      var errEl = document.getElementById('login-error');
+      errEl.textContent = 'Nepodarilo sa overiť heslo (' + (err && err.message ? err.message : err) + ').';
+      errEl.style.display='block';
+    });
+  }
+
+  document.getElementById('btn-logout').addEventListener('click', function(){ adminAuthed=false; renderAdminGateOrShell(); });
+
+  document.getElementById('btn-change-pass').addEventListener('click', function(){
+    var current = prompt('Zadajte súčasné heslo:');
+    if(current===null) return;
+    hashPassword(current, adminAuthHash.salt).then(function(hash){
+      if(hash!==adminAuthHash.hash){ alert('Nesprávne súčasné heslo.'); return; }
+      var np1=prompt('Nové heslo (min. 4 znaky):');
+      if(np1===null) return;
+      if(np1.length<4){ alert('Heslo musí mať aspoň 4 znaky.'); return; }
+      var np2=prompt('Potvrďte nové heslo:');
+      if(np2!==np1){ alert('Heslá sa nezhodujú.'); return; }
+      var salt=randomSalt();
+      hashPassword(np1,salt).then(function(hash2){
+        var rec={key:'adminAuth', hash:hash2, salt:salt};
+        idbPut('kv',rec).then(function(){ adminAuthHash=rec; alert('Heslo bolo zmenené.'); });
+      });
+    });
+  });
+
+  /* =========================================================
+     TEST MODE: entry state
+  ========================================================= */
+  var emptyReasonEl=document.getElementById('empty-reason');
+  var testStartSub=document.getElementById('test-start-sub');
+
+  function testIsReady(){ return activePhotos.length>0 && activePhotos.every(function(p){ return !!p.correctAnswer; }); }
+
+  function refreshTestModeEntry(){
+    if(currentAttempt) return;
+    if(!activeBatchId || activePhotos.length===0){
+      emptyReasonEl.textContent = 'Administrátor ešte nenahral fotky defektov.';
+      showTestScreen('empty');
+    } else if(!testIsReady()){
+      var defined = activePhotos.filter(function(p){ return p.correctAnswer; }).length;
+      emptyReasonEl.textContent = 'Test sa pripravuje – definovanie správnych odpovedí (' + defined + ' / ' + activePhotos.length + ' hotovo).';
+      showTestScreen('empty');
+    } else {
+      testStartSub.textContent = 'Dávka: ' + currentBatchLabel(activeBatchId) + ' · Fotiek na vyhodnotenie: ' + activePhotos.length;
+      showTestScreen('start');
+      refreshOperatorNameHistory();
+    }
+  }
+
+  function refreshOperatorNameHistory(){
+    idbGetAll('attempts').then(function(all){
+      var names = [];
+      all.forEach(function(a){ if(names.indexOf(a.operatorName)===-1) names.push(a.operatorName); });
+      names.sort(function(a,b){ return a.localeCompare(b,'sk'); });
+      var list = document.getElementById('operator-history');
+      list.innerHTML = '';
+      names.forEach(function(n){
+        var opt = document.createElement('option');
+        opt.value = n;
+        list.appendChild(opt);
+      });
+    }).catch(function(){ /* non-critical, ignore */ });
+  }
+
+  /* =========================================================
+     TEST MODE: taking the test
+  ========================================================= */
+  var fieldOpName=document.getElementById('field-op-name');
+  document.getElementById('btn-begin-test').addEventListener('click', function(){
+    var name=fieldOpName.value.trim();
+    if(!name){ document.getElementById('op-name-error').style.display='block'; return; }
+    document.getElementById('op-name-error').style.display='none';
+    currentAttempt = { batchId:activeBatchId, batchLabel:currentBatchLabel(activeBatchId), operatorName:name, startedAt:new Date(), answers:{}, index:0 };
+    showTestScreen('eval');
+    renderTestEval();
+  });
+
+  var tEvalPos=document.getElementById('t-eval-pos'), tEvalFilename=document.getElementById('t-eval-filename'), tEvalOperator=document.getElementById('t-eval-operator');
+  var tStageImg=document.getElementById('t-stage-img'), tStageFlag=document.getElementById('t-stage-flag');
+  var tBtnPrev=document.getElementById('t-btn-prev'), tBtnNext=document.getElementById('t-btn-next');
+  var tFieldNote=document.getElementById('t-field-note');
+  var tVerdictBtns=document.querySelectorAll('#screen-test-eval [data-verdict]');
+  var tFilmstrip=document.getElementById('t-filmstrip');
+
+  function renderTestEval(){
+    if(!currentAttempt) return;
+    var p = activePhotos[currentAttempt.index];
+    var ans = currentAttempt.answers[p.id];
+    tEvalPos.textContent = 'Fotka ' + (currentAttempt.index+1) + ' / ' + activePhotos.length;
+    tEvalFilename.textContent = p.name;
+    tEvalOperator.textContent = currentAttempt.operatorName;
+    tStageImg.src = p.url; tStageImg.alt = p.name;
+    tFieldNote.value = ans ? (ans.note||'') : '';
+    tBtnPrev.disabled = currentAttempt.index===0;
+    tBtnNext.disabled = currentAttempt.index===activePhotos.length-1;
+
+    tVerdictBtns.forEach(function(btn){ btn.classList.toggle('is-selected', ans && ans.given===btn.getAttribute('data-verdict')); });
+    if(ans){
+      tStageFlag.style.display='inline-block';
+      tStageFlag.textContent = VERDICT_LABEL[ans.given];
+      tStageFlag.style.background = VERDICT_COLOR[VERDICT_CLASS[ans.given]];
+    } else { tStageFlag.style.display='none'; }
+
+    tFilmstrip.innerHTML='';
+    activePhotos.forEach(function(ph,idx){
+      var item=document.createElement('div'); item.className='film-item';
+      if(idx===currentAttempt.index) item.classList.add('is-current');
+      var a=currentAttempt.answers[ph.id];
+      if(a) item.classList.add('status-'+VERDICT_CLASS[a.given]);
+      var img=document.createElement('img'); img.src=ph.url; img.alt=ph.name;
+      item.appendChild(img);
+      item.addEventListener('click', function(){ currentAttempt.index=idx; renderTestEval(); });
+      tFilmstrip.appendChild(item);
+    });
+    var cur=tFilmstrip.children[currentAttempt.index];
+    if(cur && cur.scrollIntoView) cur.scrollIntoView({inline:'center', block:'nearest'});
+  }
+
+  tFieldNote.addEventListener('input', function(){
+    if(!currentAttempt) return;
+    var p=activePhotos[currentAttempt.index];
+    var ans=currentAttempt.answers[p.id] || (currentAttempt.answers[p.id]={given:null,note:'',evaluatedAt:null});
+    ans.note = tFieldNote.value;
+  });
+  tBtnPrev.addEventListener('click', function(){ if(currentAttempt && currentAttempt.index>0){ currentAttempt.index--; renderTestEval(); } });
+  tBtnNext.addEventListener('click', function(){ if(currentAttempt && currentAttempt.index<activePhotos.length-1){ currentAttempt.index++; renderTestEval(); } });
+  tVerdictBtns.forEach(function(btn){ btn.addEventListener('click', function(){ setTestVerdict(btn.getAttribute('data-verdict')); }); });
+
+  function setTestVerdict(v){
+    if(!currentAttempt) return;
+    var p=activePhotos[currentAttempt.index];
+    var ans=currentAttempt.answers[p.id] || (currentAttempt.answers[p.id]={given:null,note:'',evaluatedAt:null});
+    ans.given=v; ans.evaluatedAt=new Date();
+
+    var allDone = activePhotos.every(function(ph){ return currentAttempt.answers[ph.id] && currentAttempt.answers[ph.id].given; });
+    if(allDone){ finishAttempt(); return; }
+
+    var nextUnanswered=-1;
+    for(var i=currentAttempt.index+1;i<activePhotos.length;i++){
+      if(!currentAttempt.answers[activePhotos[i].id] || !currentAttempt.answers[activePhotos[i].id].given){ nextUnanswered=i; break; }
+    }
+    if(nextUnanswered===-1){
+      for(var j=0;j<activePhotos.length;j++){
+        if(!currentAttempt.answers[activePhotos[j].id] || !currentAttempt.answers[activePhotos[j].id].given){ nextUnanswered=j; break; }
+      }
+    }
+    currentAttempt.index = nextUnanswered!==-1 ? nextUnanswered : Math.min(currentAttempt.index+1, activePhotos.length-1);
+    renderTestEval();
+  }
+
+  document.addEventListener('keydown', function(e){
+    if(!screensTest.eval.classList.contains('is-active')) return;
+    var tag=document.activeElement.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA') return;
+    if(e.key==='1') setTestVerdict('OK');
+    else if(e.key==='2') setTestVerdict('HRANICNE');
+    else if(e.key==='3') setTestVerdict('NOK');
+    else if(e.key==='ArrowLeft') tBtnPrev.click();
+    else if(e.key==='ArrowRight') tBtnNext.click();
+  });
+
+  function finishAttempt(){
+    var answersArr = activePhotos.map(function(p){
+      var a=currentAttempt.answers[p.id];
+      return { photoId:p.id, name:p.name, given:a.given, note:a.note||'', correctAtTime:p.correctAnswer, isCorrect:a.given===p.correctAnswer };
+    });
+    var correctCount = answersArr.filter(function(a){ return a.isCorrect; }).length;
+    var record = {
+      batchId: currentAttempt.batchId, batchLabel: currentAttempt.batchLabel,
+      operatorName: currentAttempt.operatorName, startedAt: currentAttempt.startedAt, finishedAt: new Date(),
+      answers: answersArr, totalCount: answersArr.length, correctCount: correctCount,
+      scorePercent: Math.round(correctCount/answersArr.length*100), archived: false
+    };
+    idbPut('attempts', record).then(function(id){
+      record.id = id;
+      currentAttempt = null;
+      renderResultScreen(record);
+      showTestScreen('result');
+    });
+  }
+
+  /* =========================================================
+     TEST MODE: result screen (no correct-answer text shown)
+  ========================================================= */
+  var resOpName=document.getElementById('res-op-name'), resPct=document.getElementById('res-pct'), resFrac=document.getElementById('res-frac'), resWhen=document.getElementById('res-when'), resList=document.getElementById('res-list');
+  function scoreTier(pct){ return pct>=90?'tier-ok':(pct>=70?'tier-warn':'tier-nok'); }
+
+  function renderResultScreen(record){
+    resOpName.textContent = record.operatorName + (record.batchLabel ? (' · ' + record.batchLabel) : '');
+    resPct.textContent = record.scorePercent + ' %';
+    resPct.className = 'big-pct ' + scoreTier(record.scorePercent);
+    resFrac.textContent = record.correctCount + ' / ' + record.totalCount + ' správne';
+    resWhen.textContent = new Date(record.finishedAt).toLocaleString('sk-SK');
+
+    resList.innerHTML='';
+    lightboxAnswers = record.answers;
+    lightboxPhotos = activePhotos;
+    record.answers.forEach(function(a, idx){
+      var p = activePhotos.find(function(ph){ return ph.id===a.photoId; });
+      var li=document.createElement('li');
+      li.className = a.isCorrect ? 'is-hit' : 'is-miss';
+      li.style.cursor = 'pointer';
+      li.title = 'Kliknutím zobrazíte fotku na celú obrazovku';
+      li.addEventListener('click', function(){ openLightbox(idx, true, 'Vaša odpoveď: '); });
+      var img=document.createElement('img'); img.src=p?p.url:''; img.alt=a.name;
+      var nameSpan=document.createElement('span'); nameSpan.className='vl-name';
+      nameSpan.textContent = (idx+1) + '. ' + a.name + ' — vaša odpoveď: ' + VERDICT_LABEL[a.given];
+      var mark=document.createElement('span'); mark.className='mark '+(a.isCorrect?'hit':'miss'); mark.textContent=a.isCorrect?'✓':'✕';
+      li.appendChild(img); li.appendChild(nameSpan); li.appendChild(mark);
+      resList.appendChild(li);
+    });
+  }
+
+  document.getElementById('btn-print-my-result').addEventListener('click', function(){ window.print(); });
+  document.getElementById('btn-new-attempt').addEventListener('click', function(){
+    fieldOpName.value='';
+    document.getElementById('op-name-error').style.display='none';
+    currentAttempt = null;
+    refreshTestModeEntry();
+  });
+
+  /* =========================================================
+     ADMIN: REPORTS PANEL
+  ========================================================= */
+  var aggCount=document.getElementById('agg-count'), aggAvg=document.getElementById('agg-avg'), aggBest=document.getElementById('agg-best'), aggWorst=document.getElementById('agg-worst');
+  var attemptsTbody=document.getElementById('attempts-tbody');
+  var batchOverviewBlock=document.getElementById('batch-overview-block'), batchOverviewTbody=document.getElementById('batch-overview-tbody');
+  var photoStatsBlock=document.getElementById('photo-stats-block'), photoStatsTbody=document.getElementById('photo-stats-tbody');
+
+  function renderReportsPanel(){
+    var filterVal = reportBatchSelect.value || 'all';
+    var archiveVal = document.getElementById('report-archive-filter').value || 'active';
+    var dateFromVal = document.getElementById('report-date-from').value;
+    var dateToVal = document.getElementById('report-date-to').value;
+    var sortVal = document.getElementById('report-sort-select').value || 'score-asc';
+    idbGetAll('attempts').then(function(allAttemptsRaw){
+      var allAttempts = archiveVal==='active' ? allAttemptsRaw.filter(function(a){ return !a.archived; })
+        : archiveVal==='archived' ? allAttemptsRaw.filter(function(a){ return !!a.archived; })
+        : allAttemptsRaw.slice();
+      var attempts = filterVal==='all' ? allAttempts.slice() : allAttempts.filter(function(a){ return a.batchId===filterVal; });
+      if(dateFromVal){
+        var fromTs = new Date(dateFromVal + 'T00:00:00').getTime();
+        attempts = attempts.filter(function(a){ return new Date(a.finishedAt).getTime() >= fromTs; });
+      }
+      if(dateToVal){
+        var toTs = new Date(dateToVal + 'T23:59:59').getTime();
+        attempts = attempts.filter(function(a){ return new Date(a.finishedAt).getTime() <= toTs; });
+      }
+      attempts.sort(function(a,b){
+        if(sortVal==='score-asc') return a.scorePercent - b.scorePercent;
+        if(sortVal==='score-desc') return b.scorePercent - a.scorePercent;
+        if(sortVal==='date-asc') return new Date(a.finishedAt) - new Date(b.finishedAt);
+        return new Date(b.finishedAt) - new Date(a.finishedAt); // date-desc default
+      });
+      attemptsCache = attempts;
+
+      aggCount.textContent = attempts.length;
+      if(attempts.length){
+        var avg = Math.round(attempts.reduce(function(s,a){ return s+a.scorePercent; },0)/attempts.length);
+        var best = attempts.reduce(function(m,a){ return a.scorePercent>m.scorePercent?a:m; }, attempts[0]);
+        var worst = attempts.reduce(function(m,a){ return a.scorePercent<m.scorePercent?a:m; }, attempts[0]);
+        aggAvg.textContent = avg+' %';
+        aggBest.textContent = best.scorePercent+' % ('+best.operatorName+')';
+        aggWorst.textContent = worst.scorePercent+' % ('+worst.operatorName+')';
+      } else {
+        aggAvg.textContent='0 %'; aggBest.textContent='—'; aggWorst.textContent='—';
+      }
+
+      attemptsTbody.innerHTML='';
+      if(attempts.length===0){
+        var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=6; td.className='empty-state';
+        td.textContent='Zatiaľ žiadne dokončené testy.'; tr.appendChild(td); attemptsTbody.appendChild(tr);
+      } else {
+        attempts.forEach(function(rec){
+          var tr=document.createElement('tr'); tr.className='is-clickable';
+          tr.addEventListener('click', function(){ openAttemptDetail(rec); });
+          var td1=document.createElement('td');
+          td1.textContent = rec.operatorName + (rec.archived ? ' 📦' : '');
+          if(rec.archived) td1.title='V archíve';
+          tr.appendChild(td1);
+          var td2=document.createElement('td'); td2.textContent=rec.batchLabel||currentBatchLabel(rec.batchId); tr.appendChild(td2);
+          var td3=document.createElement('td'); td3.textContent=new Date(rec.finishedAt).toLocaleString('sk-SK'); tr.appendChild(td3);
+          var td4=document.createElement('td'); td4.textContent=rec.correctCount+' / '+rec.totalCount; tr.appendChild(td4);
+          var td5=document.createElement('td');
+          var badge=document.createElement('span'); badge.className='badge '+(rec.scorePercent>=90?'ok':(rec.scorePercent>=70?'warn':'nok')); badge.textContent=rec.scorePercent+' %';
+          td5.appendChild(badge); tr.appendChild(td5);
+          var td6=document.createElement('td'); td6.textContent='Detail →'; td6.style.color='var(--ink-faint)'; td6.style.fontSize='12px'; tr.appendChild(td6);
+          attemptsTbody.appendChild(tr);
+        });
+      }
+
+      if(filterVal==='all'){
+        batchOverviewBlock.style.display='block';
+        photoStatsBlock.style.display='none';
+        renderBatchOverview(allAttempts);
+      } else {
+        batchOverviewBlock.style.display='none';
+        photoStatsBlock.style.display='block';
+        getPhotosForBatch(filterVal).then(function(photos){ renderPhotoStats(photos, attempts); });
+      }
+    });
+  }
+
+  function renderBatchOverview(allAttempts){
+    idbGetAll('photos').then(function(allPhotos){
+      batchOverviewTbody.innerHTML='';
+      if(allBatches.length===0){
+        var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=6; td.className='empty-state';
+        td.textContent='Zatiaľ neboli vytvorené žiadne dávky.'; tr.appendChild(td); batchOverviewTbody.appendChild(tr);
+        return;
+      }
+      sortedBatches().forEach(function(b){
+        var photoCount = allPhotos.filter(function(p){ return p.batchId===b.id; }).length;
+        var batchAttempts = allAttempts.filter(function(a){ return a.batchId===b.id; });
+        var avg = batchAttempts.length ? Math.round(batchAttempts.reduce(function(s,a){ return s+a.scorePercent; },0)/batchAttempts.length) : null;
+
+        var tr=document.createElement('tr'); tr.className='is-clickable';
+        tr.addEventListener('click', function(){ reportBatchSelect.value=b.id; renderReportsPanel(); });
+
+        var td1=document.createElement('td'); td1.textContent=b.label; tr.appendChild(td1);
+        var td2=document.createElement('td'); td2.textContent=new Date(b.createdAt).toLocaleDateString('sk-SK'); tr.appendChild(td2);
+        var td3=document.createElement('td'); td3.textContent=photoCount; tr.appendChild(td3);
+        var td4=document.createElement('td'); td4.textContent=batchAttempts.length; tr.appendChild(td4);
+        var td5=document.createElement('td'); td5.textContent = avg===null ? '—' : (avg+' %'); tr.appendChild(td5);
+        var td6=document.createElement('td');
+        var badge=document.createElement('span'); badge.className='badge '+(b.id===activeBatchId?'active':'pending'); badge.textContent=b.id===activeBatchId?'aktívna':'archív';
+        td6.appendChild(badge); tr.appendChild(td6);
+        batchOverviewTbody.appendChild(tr);
+      });
+    });
+  }
+
+  function renderPhotoStats(photos, attempts){
+    photoStatsTbody.innerHTML='';
+    if(photos.length===0 || attempts.length===0){
+      var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=4; td.className='empty-state';
+      td.textContent='Zatiaľ nie sú k dispozícii žiadne dáta.'; tr.appendChild(td); photoStatsTbody.appendChild(tr);
+      return;
+    }
+    photos.forEach(function(p){
+      var seen=0, correct=0;
+      attempts.forEach(function(rec){
+        var a=rec.answers.find(function(x){ return x.photoId===p.id; });
+        if(a){ seen++; if(a.isCorrect) correct++; }
+      });
+      var tr=document.createElement('tr');
+      var td1=document.createElement('td'); var img=document.createElement('img'); img.className='rthumb'; img.src=p.url; img.alt=p.name;
+      td1.appendChild(img); tr.appendChild(td1);
+      var td2=document.createElement('td'); td2.textContent=p.name; tr.appendChild(td2);
+      var td3=document.createElement('td'); var badge=document.createElement('span');
+      badge.className='badge '+(p.correctAnswer?VERDICT_CLASS[p.correctAnswer]:'pending');
+      badge.textContent=p.correctAnswer?VERDICT_LABEL[p.correctAnswer]:'nedefinované';
+      td3.appendChild(badge); tr.appendChild(td3);
+      var td4=document.createElement('td'); td4.textContent = seen ? (Math.round(correct/seen*100)+' % ('+correct+'/'+seen+')') : '—'; tr.appendChild(td4);
+      photoStatsTbody.appendChild(tr);
+    });
+  }
+
+  document.getElementById('btn-archive-shown').addEventListener('click', function(){
+    if(attemptsCache.length===0){ alert('Pre aktuálny filter nie sú žiadne výsledky.'); return; }
+    if(!confirm('Archivovať ' + attemptsCache.length + ' zobrazených výsledkov? Nebudú sa počítať do súhrnov ani do Dashboardu, kým ich znova neobnovíte z archívu.')) return;
+    Promise.all(attemptsCache.map(function(a){ a.archived = true; return idbPut('attempts', a); })).then(renderReportsPanel);
+  });
+  document.getElementById('btn-restore-shown').addEventListener('click', function(){
+    if(attemptsCache.length===0){ alert('Pre aktuálny filter nie sú žiadne výsledky.'); return; }
+    if(!confirm('Obnoviť ' + attemptsCache.length + ' zobrazených výsledkov z archívu späť do bežných reportov?')) return;
+    Promise.all(attemptsCache.map(function(a){ a.archived = false; return idbPut('attempts', a); })).then(renderReportsPanel);
+  });
+
+  document.getElementById('btn-clear-attempts').addEventListener('click', function(){
+    var filterVal = reportBatchSelect.value || 'all';
+    var msg = filterVal==='all'
+      ? 'Naozaj vymazať VŠETKY výsledky zo VŠETKÝCH dávok? Fotky a správne odpovede zostanú zachované.'
+      : ('Naozaj vymazať výsledky iba pre dávku "' + currentBatchLabel(filterVal) + '"?');
+    if(!confirm(msg)) return;
+    if(filterVal==='all'){
+      idbClear('attempts').then(renderReportsPanel);
+    } else {
+      idbGetAll('attempts').then(function(all){
+        var toDelete = all.filter(function(a){ return a.batchId===filterVal; });
+        return Promise.all(toDelete.map(function(a){ return idbDeleteKey('attempts', a.id); }));
+      }).then(renderReportsPanel);
+    }
+  });
+
+  document.getElementById('btn-print-agg').addEventListener('click', function(){ window.print(); });
+
+  document.getElementById('btn-export-agg-csv').addEventListener('click', function(){
+    var lines=[];
+    lines.push(['Operátor','Dávka','Dátum','Správne','Celkom','Úspešnosť (%)'].map(csvEsc).join(';'));
+    attemptsCache.forEach(function(rec){
+      lines.push([rec.operatorName, rec.batchLabel||currentBatchLabel(rec.batchId), new Date(rec.finishedAt).toLocaleString('sk-SK'), rec.correctCount, rec.totalCount, rec.scorePercent].map(csvEsc).join(';'));
+    });
+    downloadCsv(lines, 'suhrn-vysledkov');
+  });
+
+  /* =========================================================
+     ADMIN: ATTEMPT DETAIL
+  ========================================================= */
+  var detOpName=document.getElementById('det-op-name'), detPct=document.getElementById('det-pct'), detFrac=document.getElementById('det-frac'), detWhen=document.getElementById('det-when');
+  var detailTbody=document.getElementById('detail-tbody');
+
+  function openAttemptDetail(rec){
+    currentDetailAttempt = rec;
+    getPhotosForBatch(rec.batchId).then(function(photos){
+      detOpName.textContent = rec.operatorName;
+      detPct.textContent = rec.scorePercent+' %';
+      detPct.className = 'big-pct ' + scoreTier(rec.scorePercent);
+      detFrac.textContent = rec.correctCount+' / '+rec.totalCount+' správne';
+      detWhen.textContent = new Date(rec.finishedAt).toLocaleString('sk-SK') + ' · ' + (rec.batchLabel||currentBatchLabel(rec.batchId));
+
+      lightboxAnswers = rec.answers;
+      lightboxPhotos = photos;
+
+      detailTbody.innerHTML='';
+      rec.answers.forEach(function(a, idx){
+        var p = photos.find(function(ph){ return ph.id===a.photoId; });
+        var tr=document.createElement('tr');
+        tr.className='is-clickable';
+        tr.title='Kliknutím zobrazíte fotku na celú obrazovku';
+        tr.addEventListener('click', function(){ openLightbox(idx, true); });
+        var td0=document.createElement('td'); td0.textContent=String(idx+1).padStart(2,'0'); tr.appendChild(td0);
+        var td1=document.createElement('td'); var img=document.createElement('img'); img.className='rthumb'; img.src=p?p.url:''; img.alt=a.name;
+        td1.appendChild(img); tr.appendChild(td1);
+        var td2=document.createElement('td'); td2.textContent=a.name; tr.appendChild(td2);
+        var td3=document.createElement('td'); var b1=document.createElement('span'); b1.className='badge '+VERDICT_CLASS[a.given]; b1.textContent=VERDICT_LABEL[a.given];
+        td3.appendChild(b1); tr.appendChild(td3);
+        var td4=document.createElement('td'); var b2=document.createElement('span'); b2.className='badge '+(a.correctAtTime?VERDICT_CLASS[a.correctAtTime]:'pending'); b2.textContent=a.correctAtTime?VERDICT_LABEL[a.correctAtTime]:'—';
+        td4.appendChild(b2); tr.appendChild(td4);
+        var td5=document.createElement('td'); var mark=document.createElement('span'); mark.className='mark '+(a.isCorrect?'hit':'miss'); mark.style.display='inline-flex'; mark.textContent=a.isCorrect?'✓':'✕';
+        td5.appendChild(mark); tr.appendChild(td5);
+        var td6=document.createElement('td'); td6.textContent=a.note||'—'; tr.appendChild(td6);
+        detailTbody.appendChild(tr);
+      });
+
+      showAdminPanel('detail');
+    });
+  }
+  document.getElementById('btn-detail-back').addEventListener('click', function(){ showAdminPanel('reports'); });
+  document.getElementById('btn-print-detail').addEventListener('click', function(){ window.print(); });
+
+  /* =========================================================
+     LIGHTBOX (training / feedback review of individual evaluations)
+  ========================================================= */
+  var lightboxEl = document.getElementById('lightbox');
+  var lbImg = document.getElementById('lb-img');
+  var lbMeta = document.querySelector('.lb-meta');
+  var lbName = document.getElementById('lb-name');
+  var lbBadges = document.getElementById('lb-badges');
+  var lbNote = document.getElementById('lb-note');
+  var lbPrev = document.getElementById('lb-prev');
+  var lbNext = document.getElementById('lb-next');
+
+  function openLightbox(idx, showCorrect, givenLabelPrefix){
+    lightboxIndex = idx;
+    lightboxShowCorrect = (showCorrect===undefined) ? true : showCorrect;
+    lightboxGivenLabel = givenLabelPrefix || 'Operátor: ';
+    renderLightbox();
+    lightboxEl.style.display = 'flex';
+  }
+  function closeLightbox(){ lightboxEl.style.display = 'none'; }
+  function renderLightbox(){
+    var a = lightboxAnswers[lightboxIndex];
+    if(!a) return;
+    var p = lightboxPhotos.find(function(ph){ return ph.id===a.photoId; });
+    lbImg.src = p ? p.url : '';
+    lbImg.alt = a.name;
+    lbMeta.className = 'lb-meta ' + (a.isCorrect ? 'is-hit' : 'is-miss');
+    lbName.textContent = (lightboxIndex+1) + ' / ' + lightboxAnswers.length + ' — ' + a.name;
+
+    lbBadges.innerHTML = '';
+    var given = document.createElement('span'); given.className='badge '+VERDICT_CLASS[a.given];
+    given.textContent = lightboxGivenLabel + VERDICT_LABEL[a.given];
+    lbBadges.appendChild(given);
+    if(lightboxShowCorrect && a.correctAtTime){
+      var correct = document.createElement('span'); correct.className='badge '+VERDICT_CLASS[a.correctAtTime]; correct.textContent='Správne: '+VERDICT_LABEL[a.correctAtTime];
+      lbBadges.appendChild(correct);
+    }
+    var mark = document.createElement('span'); mark.className='badge '+(a.isCorrect?'ok':'nok'); mark.textContent=a.isCorrect?'Zhoda ✓':'Nezhoda ✕';
+    lbBadges.appendChild(mark);
+
+    lbNote.textContent = a.note ? ('Poznámka: ' + a.note) : '';
+    lbPrev.disabled = lightboxIndex===0;
+    lbNext.disabled = lightboxIndex===lightboxAnswers.length-1;
+  }
+  lbPrev.addEventListener('click', function(){ if(lightboxIndex>0){ lightboxIndex--; renderLightbox(); } });
+  lbNext.addEventListener('click', function(){ if(lightboxIndex<lightboxAnswers.length-1){ lightboxIndex++; renderLightbox(); } });
+  document.getElementById('lb-close').addEventListener('click', closeLightbox);
+  lightboxEl.addEventListener('click', function(e){ if(e.target===lightboxEl) closeLightbox(); });
+  document.addEventListener('keydown', function(e){
+    if(lightboxEl.style.display==='none' || !lightboxEl.style.display) return;
+    if(e.key==='Escape') closeLightbox();
+    else if(e.key==='ArrowLeft') lbPrev.click();
+    else if(e.key==='ArrowRight') lbNext.click();
+  });
+
+  /* =========================================================
+     ADMIN: DASHBOARD (trend over time, per operator or per area)
+  ========================================================= */
+  var dashAreaSelect = document.getElementById('dash-area-select');
+  var dashOperatorSelect = document.getElementById('dash-operator-select');
+  var dashDateFrom = document.getElementById('dash-date-from');
+  var dashDateTo = document.getElementById('dash-date-to');
+  var dashChartWrap = document.getElementById('dash-chart-wrap');
+  var dashChartTitle = document.getElementById('dash-chart-title');
+  var dashTrendText = document.getElementById('dash-trend-text');
+  var dashEmpty = document.getElementById('dash-empty');
+
+  function refreshDashboardFilters(){
+    var prevArea = dashAreaSelect.value || 'all';
+    dashAreaSelect.innerHTML = '';
+    var optAllA = document.createElement('option'); optAllA.value='all'; optAllA.textContent='Všetky sekcie';
+    dashAreaSelect.appendChild(optAllA);
+    sortedAreas().forEach(function(a){
+      var opt=document.createElement('option'); opt.value=a.id; opt.textContent=a.label;
+      dashAreaSelect.appendChild(opt);
+    });
+    var optNoneA = document.createElement('option'); optNoneA.value='none'; optNoneA.textContent='Bez sekcie';
+    dashAreaSelect.appendChild(optNoneA);
+    var validArea = Array.prototype.some.call(dashAreaSelect.options, function(o){ return o.value===prevArea; });
+    dashAreaSelect.value = validArea ? prevArea : 'all';
+  }
+
+  dashAreaSelect.addEventListener('change', renderDashboard);
+  dashOperatorSelect.addEventListener('change', renderDashboard);
+  dashDateFrom.addEventListener('change', renderDashboard);
+  dashDateTo.addEventListener('change', renderDashboard);
+
+  function batchIdsForSelectedArea(){
+    var areaVal = dashAreaSelect.value || 'all';
+    if(areaVal==='all') return allBatches.map(function(b){ return b.id; });
+    if(areaVal==='none') return allBatches.filter(function(b){ return !b.areaId; }).map(function(b){ return b.id; });
+    return allBatches.filter(function(b){ return b.areaId===areaVal; }).map(function(b){ return b.id; });
+  }
+
+  function refreshDashboardOperators(){
+    var batchIds = batchIdsForSelectedArea();
+    return idbGetAll('attempts').then(function(all){
+      var relevant = all.filter(function(a){ return batchIds.indexOf(a.batchId)!==-1 && !a.archived; });
+      var names = [];
+      relevant.forEach(function(a){ if(names.indexOf(a.operatorName)===-1) names.push(a.operatorName); });
+      names.sort(function(a,b){ return a.localeCompare(b,'sk'); });
+      var prevVal = dashOperatorSelect.value || 'all';
+      dashOperatorSelect.innerHTML = '<option value="all">Všetci operátori (priemer)</option>';
+      names.forEach(function(n){
+        var opt=document.createElement('option'); opt.value=n; opt.textContent=n;
+        dashOperatorSelect.appendChild(opt);
+      });
+      var stillValid = Array.prototype.some.call(dashOperatorSelect.options, function(o){ return o.value===prevVal; });
+      dashOperatorSelect.value = stillValid ? prevVal : 'all';
+    });
+  }
+
+  function renderDashboard(){
+    refreshDashboardOperators().then(function(){
+      var batchIds = batchIdsForSelectedArea();
+      var opVal = dashOperatorSelect.value || 'all';
+      var fromVal = dashDateFrom.value, toVal = dashDateTo.value;
+
+      idbGetAll('attempts').then(function(all){
+        var scoped = all.filter(function(a){ return batchIds.indexOf(a.batchId)!==-1 && !a.archived; });
+        if(fromVal){ var fromTs0=new Date(fromVal+'T00:00:00').getTime(); scoped = scoped.filter(function(a){ return new Date(a.finishedAt).getTime()>=fromTs0; }); }
+        if(toVal){ var toTs0=new Date(toVal+'T23:59:59').getTime(); scoped = scoped.filter(function(a){ return new Date(a.finishedAt).getTime()<=toTs0; }); }
+
+        renderOperatorComparison(scoped);
+
+        var attempts = opVal!=='all' ? scoped.filter(function(a){ return a.operatorName===opVal; }) : scoped.slice();
+        attempts.sort(function(a,b){ return new Date(a.finishedAt) - new Date(b.finishedAt); });
+
+        var points;
+        if(opVal!=='all'){
+          dashChartTitle.textContent = 'Vývoj úspešnosti operátora „' + opVal + '“ v čase';
+          points = attempts.map(function(a){ return { date:new Date(a.finishedAt), y:a.scorePercent, label:a.operatorName+' — '+a.scorePercent+' %' }; });
+        } else {
+          dashChartTitle.textContent = 'Priemerná úspešnosť operátorov v čase';
+          var byDay = {};
+          attempts.forEach(function(a){
+            var day = new Date(a.finishedAt).toISOString().slice(0,10);
+            if(!byDay[day]) byDay[day] = [];
+            byDay[day].push(a.scorePercent);
+          });
+          points = Object.keys(byDay).sort().map(function(day){
+            var vals = byDay[day];
+            var avg = Math.round(vals.reduce(function(s,v){ return s+v; },0)/vals.length);
+            return { date:new Date(day+'T12:00:00'), y:avg, label:day+' — priemer '+avg+' % ('+vals.length+' test.)' };
+          });
+        }
+
+        var trendPill = document.getElementById('dash-trend-pill');
+        var trendArrow = document.getElementById('dash-trend-arrow');
+
+        if(points.length===0){
+          dashChartWrap.innerHTML=''; dashEmpty.style.display='block';
+          dashTrendText.textContent=''; trendArrow.textContent='—'; trendPill.className='trend-pill trend-flat';
+          return;
+        }
+        dashEmpty.style.display='none';
+        dashChartWrap.innerHTML = buildLineChartSvg(points, 180);
+
+        if(points.length>=2){
+          var mid = Math.floor(points.length/2);
+          var firstHalf = points.slice(0, Math.max(mid,1));
+          var secondHalf = points.slice(mid);
+          var avgFirst = firstHalf.reduce(function(s,p){ return s+p.y; },0)/firstHalf.length;
+          var avgSecond = secondHalf.reduce(function(s,p){ return s+p.y; },0)/secondHalf.length;
+          var delta = Math.round(avgSecond - avgFirst);
+          var sign = delta>0 ? '+' : '';
+          if(delta>=3){
+            trendPill.className='trend-pill trend-up'; trendArrow.textContent='▲';
+            dashTrendText.textContent = 'Zlepšuje sa (' + sign + delta + ' percentuálnych bodov)';
+          } else if(delta<=-3){
+            trendPill.className='trend-pill trend-down'; trendArrow.textContent='▼';
+            dashTrendText.textContent = 'Zhoršuje sa (' + sign + delta + ' percentuálnych bodov)';
+          } else {
+            trendPill.className='trend-pill trend-flat'; trendArrow.textContent='▬';
+            dashTrendText.textContent = 'Stabilné (' + sign + delta + ' percentuálnych bodov)';
+          }
+        } else {
+          trendPill.className='trend-pill trend-flat'; trendArrow.textContent='—';
+          dashTrendText.textContent = 'Potrebné aspoň 2 merania';
+        }
+      });
+    });
+  }
+
+  function computeOperatorStats(attempts){
+    var byOp = {};
+    attempts.forEach(function(a){
+      if(!byOp[a.operatorName]) byOp[a.operatorName] = { name:a.operatorName, count:0, sum:0 };
+      byOp[a.operatorName].count++;
+      byOp[a.operatorName].sum += a.scorePercent;
+    });
+    return Object.keys(byOp).map(function(name){
+      var o = byOp[name];
+      return { name:name, count:o.count, avg:Math.round(o.sum/o.count) };
+    }).sort(function(a,b){ return a.avg-b.avg; }); // worst first
+  }
+  // Capability thresholds: 100–90% spôsobilý, 90–80% podmienečne spôsobilý, pod 80% nespôsobilý
+  function tierFor(pct){ return pct>=90?'ok':(pct>=80?'warn':'nok'); }
+  function tierLabel(tier){ return tier==='ok' ? 'Spôsobilý' : (tier==='warn' ? 'Podmienečne spôsobilý' : 'Nespôsobilý'); }
+  function recommendationFor(tier, count, medianCount){
+    var enough = count >= Math.max(medianCount, 3);
+    if(tier==='ok') return enough ? 'Potvrdené výsledkami' : 'Sledovať — zatiaľ málo testov';
+    if(tier==='warn') return enough ? 'Zvážiť doškolenie' : 'Zatiaľ málo dát';
+    return enough ? 'Odporúčané doškolenie' : 'Potrebuje zaškolenie';
+  }
+
+  function renderOperatorComparison(attempts){
+    var stats = computeOperatorStats(attempts);
+    var barWrap = document.getElementById('dash-bar-wrap');
+    var barEmpty = document.getElementById('dash-bar-empty');
+    var scatterWrap = document.getElementById('dash-scatter-wrap');
+    var scatterEmpty = document.getElementById('dash-scatter-empty');
+    var pieWrap = document.getElementById('dash-pie-wrap');
+    var pieLegend = document.getElementById('dash-pie-legend');
+    var hlWrap = document.getElementById('dash-highlights');
+    var matrixTbody = document.getElementById('dash-matrix-tbody');
+    var matrixEmpty = document.getElementById('dash-matrix-empty');
+
+    if(stats.length===0){
+      barWrap.innerHTML=''; barEmpty.style.display='block';
+      scatterWrap.innerHTML=''; scatterEmpty.style.display='block';
+      pieWrap.innerHTML=''; pieLegend.innerHTML='';
+      hlWrap.innerHTML='<div class="empty-state">Zatiaľ žiadne dáta.</div>';
+      matrixTbody.innerHTML=''; matrixEmpty.style.display='block';
+      return;
+    }
+    barEmpty.style.display='none'; scatterEmpty.style.display='none'; matrixEmpty.style.display='none';
+
+    barWrap.innerHTML = buildBarChartSvg(stats.slice().sort(function(a,b){ return a.avg-b.avg; }));
+    scatterWrap.innerHTML = buildScatterChartSvg(stats);
+
+    var medianCount = stats.slice().sort(function(a,b){ return a.count-b.count; })[Math.floor(stats.length/2)].count;
+
+    // Pie chart: distribution of operators across capability tiers
+    var counts = { ok:0, warn:0, nok:0 };
+    stats.forEach(function(s){ counts[tierFor(s.avg)]++; });
+    pieWrap.innerHTML = buildPieChartSvg(counts);
+    pieLegend.innerHTML =
+      '<div class="pie-legend-row"><span class="pie-legend-dot" style="background:'+tierColor('ok')+'"></span>Spôsobilí <span class="pl-count">'+counts.ok+'</span></div>' +
+      '<div class="pie-legend-row"><span class="pie-legend-dot" style="background:'+tierColor('warn')+'"></span>Podmienečne <span class="pl-count">'+counts.warn+'</span></div>' +
+      '<div class="pie-legend-row"><span class="pie-legend-dot" style="background:'+tierColor('nok')+'"></span>Nespôsobilí <span class="pl-count">'+counts.nok+'</span></div>';
+
+    // Highlights: top 4 needing attention, top 2 role models (rewarding both score AND test count)
+    var attention = stats.filter(function(s){ return s.avg<80; })
+      .sort(function(a,b){ return (b.count-a.count) || (a.avg-b.avg); }).slice(0,4);
+    var roleModels = stats.filter(function(s){ return s.avg>=90; })
+      .sort(function(a,b){ return (b.avg+b.count) - (a.avg+a.count); }).slice(0,2);
+
+    function hlCardHtml(s, tier){
+      var flag = (tier==='nok' && s.count>=Math.max(medianCount,3)) ? '<div class="hl-card-flag">Veľa testov, stále zle</div>' : '';
+      return '<div class="hl-card tier-'+tier+'">' +
+        '<div class="hl-card-name">'+escapeHtml(s.name)+'</div>' +
+        '<div class="hl-card-pct">'+s.avg+' %</div>' +
+        '<div class="hl-card-count">'+s.count+' test'+(s.count===1?'':(s.count<5?'y':'ov'))+'</div>' +
+        flag + '</div>';
+    }
+    var hlHtml = '';
+    hlHtml += '<div class="hl-label">Vyžaduje pozornosť</div>';
+    hlHtml += attention.length ? '<div class="hl-card-grid">' + attention.map(function(s){ return hlCardHtml(s,'nok'); }).join('') + '</div>'
+      : '<div class="dash-card-sub" style="margin:0;">Žiadni operátori pod 80 %.</div>';
+    hlHtml += '<div class="hl-label">Vzory</div>';
+    hlHtml += roleModels.length ? '<div class="hl-card-grid">' + roleModels.map(function(s){ return hlCardHtml(s,'ok'); }).join('') + '</div>'
+      : '<div class="dash-card-sub" style="margin:0;">Zatiaľ žiadni operátori nad 90 %.</div>';
+    hlWrap.innerHTML = hlHtml;
+
+    // Full capability matrix table
+    matrixTbody.innerHTML = '';
+    stats.forEach(function(s){
+      var tier = tierFor(s.avg);
+      var tr = document.createElement('tr');
+      var td1=document.createElement('td'); td1.textContent=s.name; tr.appendChild(td1);
+      var td2=document.createElement('td'); var b=document.createElement('span'); b.className='badge '+tier; b.textContent=s.avg+' %'; td2.appendChild(b); tr.appendChild(td2);
+      var td3=document.createElement('td'); td3.textContent=s.count; tr.appendChild(td3);
+      var td4=document.createElement('td'); var b2=document.createElement('span'); b2.className='badge '+tier; b2.textContent=tierLabel(tier); td4.appendChild(b2); tr.appendChild(td4);
+      var td5=document.createElement('td'); td5.textContent=recommendationFor(tier, s.count, medianCount); tr.appendChild(td5);
+      matrixTbody.appendChild(tr);
+    });
+  }
+
+  function buildLineChartSvg(points, height){
+    var W=800, H=height||300, padL=44, padR=20, padT=16, padB=34;
+    var innerW = W-padL-padR, innerH = H-padT-padB;
+    var minDate = points[0].date.getTime(), maxDate = points[points.length-1].date.getTime();
+    var dateSpan = Math.max(maxDate-minDate, 1);
+    function xFor(d){ return points.length===1 ? padL+innerW/2 : padL + ((d.getTime()-minDate)/dateSpan)*innerW; }
+    function yFor(v){ return padT + innerH - (Math.max(0,Math.min(100,v))/100)*innerH; }
+
+    var gridLines = [0,25,50,75,100].map(function(v){
+      var y = yFor(v);
+      return '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="#2A3350" stroke-width="1" stroke-dasharray="3,4"/>' +
+             '<text x="'+(padL-10)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="#8A90A0" font-family="IBM Plex Mono, monospace">'+v+'%</text>';
+    }).join('');
+
+    var pathD = points.map(function(p,i){ return (i===0?'M':'L') + xFor(p.date).toFixed(1) + ',' + yFor(p.y).toFixed(1); }).join(' ');
+
+    var trendPath = '';
+    if(points.length>=2){
+      var xs = points.map(function(p){ return p.date.getTime(); });
+      var ys = points.map(function(p){ return p.y; });
+      var n = xs.length;
+      var meanX = xs.reduce(function(s,v){return s+v;},0)/n;
+      var meanY = ys.reduce(function(s,v){return s+v;},0)/n;
+      var num=0, den=0;
+      for(var k=0;k<n;k++){ num += (xs[k]-meanX)*(ys[k]-meanY); den += (xs[k]-meanX)*(xs[k]-meanX); }
+      var slope = den===0 ? 0 : num/den;
+      var intercept = meanY - slope*meanX;
+      var yStart = intercept + slope*minDate;
+      var yEnd = intercept + slope*maxDate;
+      var trendColor = (yEnd-yStart)>=3 ? '#1F7A54' : ((yEnd-yStart)<=-3 ? '#AE2E22' : '#8A90A0');
+      trendPath = '<line x1="'+xFor(new Date(minDate)).toFixed(1)+'" y1="'+yFor(yStart).toFixed(1)+'" x2="'+xFor(new Date(maxDate)).toFixed(1)+'" y2="'+yFor(yEnd).toFixed(1)+'" stroke="'+trendColor+'" stroke-width="2" stroke-dasharray="6,4"/>';
+    }
+
+    var dots = points.map(function(p){
+      var x=xFor(p.date).toFixed(1), y=yFor(p.y).toFixed(1);
+      return '<circle class="chart-pt" cx="'+x+'" cy="'+y+'" r="4" fill="#232E48" stroke="#fff" stroke-width="1.5"><title>'+escapeHtml(p.label)+'</title></circle>';
+    }).join('');
+
+    var labelCount = Math.min(points.length, 6);
+    var labelIdxs = [];
+    for(var i=0;i<labelCount;i++){ labelIdxs.push(Math.round(i*(points.length-1)/Math.max(labelCount-1,1))); }
+    var uniqIdxs = labelIdxs.filter(function(v,i,arr){ return arr.indexOf(v)===i; });
+    var xLabels = uniqIdxs.map(function(idx){
+      var p = points[idx];
+      var x = xFor(p.date).toFixed(1);
+      var lbl = p.date.toLocaleDateString('sk-SK', {day:'2-digit', month:'2-digit'});
+      return '<text x="'+x+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="11" fill="#8A90A0" font-family="IBM Plex Mono, monospace">'+lbl+'</text>';
+    }).join('');
+
+    return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">' +
+      gridLines +
+      trendPath +
+      '<path d="'+pathD+'" fill="none" stroke="#232E48" stroke-width="2.5"/>' +
+      dots + xLabels +
+      '</svg>';
+  }
+
+  function tierColor(tier){ return tier==='ok' ? '#1F7A54' : (tier==='warn' ? '#96650A' : '#AE2E22'); }
+
+  function buildPieChartSvg(counts){
+    var total = counts.ok + counts.warn + counts.nok;
+    var size=110, cx=size/2, cy=size/2, r=size/2-4;
+    var holeR = r*0.56;
+    var centerLabel = '<text x="'+cx+'" y="'+(cy-2)+'" text-anchor="middle" font-size="20" font-weight="600" fill="#1B2130" font-family="IBM Plex Mono, monospace">'+total+'</text>' +
+      '<text x="'+cx+'" y="'+(cy+14)+'" text-anchor="middle" font-size="8.5" fill="#8A90A0" font-family="IBM Plex Sans, sans-serif">operátorov</text>';
+
+    if(total===0){
+      return '<svg viewBox="0 0 '+size+' '+size+'"><circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="#EDEFF2"/><circle cx="'+cx+'" cy="'+cy+'" r="'+holeR+'" fill="var(--panel)"/>'+centerLabel+'</svg>';
+    }
+    var order = [['ok',counts.ok],['warn',counts.warn],['nok',counts.nok]].filter(function(e){ return e[1]>0; });
+    if(order.length===1){
+      return '<svg viewBox="0 0 '+size+' '+size+'"><circle cx="'+cx+'" cy="'+cy+'" r="'+r+'" fill="'+tierColor(order[0][0])+'"><title>'+tierLabel(order[0][0])+' — '+order[0][1]+'</title></circle><circle cx="'+cx+'" cy="'+cy+'" r="'+holeR+'" fill="var(--panel)"/>'+centerLabel+'</svg>';
+    }
+    var angle = -90; // start at top
+    var slices = order.map(function(e){
+      var tier=e[0], count=e[1];
+      var frac = count/total;
+      var startAngle = angle;
+      var endAngle = angle + frac*360;
+      angle = endAngle;
+      var largeArc = (endAngle-startAngle)>180 ? 1 : 0;
+      var sx = cx + r*Math.cos(startAngle*Math.PI/180), sy = cy + r*Math.sin(startAngle*Math.PI/180);
+      var ex = cx + r*Math.cos(endAngle*Math.PI/180), ey = cy + r*Math.sin(endAngle*Math.PI/180);
+      var d = 'M'+cx+','+cy+' L'+sx.toFixed(2)+','+sy.toFixed(2)+' A'+r+','+r+' 0 '+largeArc+' 1 '+ex.toFixed(2)+','+ey.toFixed(2)+' Z';
+      return '<path class="pie-slice" d="'+d+'" fill="'+tierColor(tier)+'"><title>'+tierLabel(tier)+' — '+count+'</title></path>';
+    }).join('');
+    return '<svg viewBox="0 0 '+size+' '+size+'" xmlns="http://www.w3.org/2000/svg">' + slices + '<circle cx="'+cx+'" cy="'+cy+'" r="'+holeR+'" fill="var(--panel)"/>' + centerLabel + '</svg>';
+  }
+
+  function buildBarChartSvg(stats){
+    var W=800, H=Math.max(220, 46*stats.length+40), padL=140, padR=50, padT=10, padB=10;
+    var innerW = W-padL-padR, innerH = H-padT-padB;
+    var barH = Math.min(30, innerH/stats.length - 10);
+    var step = innerH/stats.length;
+
+    function xAt(v){ return padL + (v/100)*innerW; }
+    var zones =
+      '<rect x="'+xAt(0)+'" y="'+padT+'" width="'+(xAt(80)-xAt(0))+'" height="'+innerH+'" fill="var(--nok-bg)"/>' +
+      '<rect x="'+xAt(80)+'" y="'+padT+'" width="'+(xAt(90)-xAt(80))+'" height="'+innerH+'" fill="var(--warn-bg)"/>' +
+      '<rect x="'+xAt(90)+'" y="'+padT+'" width="'+(xAt(100)-xAt(90))+'" height="'+innerH+'" fill="var(--ok-bg)"/>';
+
+    var grid = [0,80,90,100].map(function(v){
+      var x = xAt(v);
+      return '<line x1="'+x+'" y1="'+padT+'" x2="'+x+'" y2="'+(H-padB)+'" stroke="#fff" stroke-width="1.5"/>' +
+             '<text x="'+x+'" y="'+(H-padB+16)+'" text-anchor="middle" font-size="10" fill="#8A90A0" font-family="IBM Plex Mono, monospace">'+v+'%</text>';
+    }).join('');
+
+    var bars = stats.map(function(s, i){
+      var y = padT + i*step + (step-barH)/2;
+      var w = (s.avg/100)*innerW;
+      var color = tierColor(tierFor(s.avg));
+      var nameShort = s.name.length>16 ? s.name.slice(0,15)+'…' : s.name;
+      return '<text x="'+(padL-10)+'" y="'+(y+barH/2+4)+'" text-anchor="end" font-size="12" fill="#1B2130" font-family="IBM Plex Sans, sans-serif">'+escapeHtml(nameShort)+'</text>' +
+        '<rect class="bar-rect" x="'+padL+'" y="'+y+'" width="'+Math.max(w,2)+'" height="'+barH+'" rx="3" fill="'+color+'"><title>'+escapeHtml(s.name)+' — '+s.avg+' % ('+s.count+' test.)</title></rect>' +
+        '<text x="'+(padL+w+8)+'" y="'+(y+barH/2+4)+'" font-size="12" font-weight="600" fill="'+color+'" font-family="IBM Plex Mono, monospace">'+s.avg+'%</text>';
+    }).join('');
+
+    return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">' + zones + grid + bars + '</svg>';
+  }
+
+  function buildScatterChartSvg(stats){
+    var W=520, H=340, padL=46, padR=20, padT=16, padB=40;
+    var innerW=W-padL-padR, innerH=H-padT-padB;
+    var maxCount = Math.max.apply(null, stats.map(function(s){ return s.count; }));
+    var xMax = Math.max(maxCount, 4);
+    var CONFIDENT_TESTS = 3; // below this, even a high score is shown as "not yet confirmed"
+
+    function xFor(c){ return padL + (c/xMax)*innerW; }
+    function yFor(v){ return padT + innerH - (Math.max(0,Math.min(100,v))/100)*innerH; }
+
+    var xThr = Math.min(W-padR, xFor(CONFIDENT_TESTS));
+    var zones =
+      '<rect x="'+padL+'" y="'+yFor(80)+'" width="'+innerW+'" height="'+(yFor(0)-yFor(80))+'" fill="var(--nok-bg)"/>' +
+      '<rect x="'+padL+'" y="'+yFor(90)+'" width="'+innerW+'" height="'+(yFor(80)-yFor(90))+'" fill="var(--warn-bg)"/>' +
+      '<rect x="'+padL+'" y="'+yFor(100)+'" width="'+(xThr-padL)+'" height="'+(yFor(90)-yFor(100))+'" fill="var(--warn-bg)"/>' +
+      '<rect x="'+xThr+'" y="'+yFor(100)+'" width="'+(W-padR-xThr)+'" height="'+(yFor(90)-yFor(100))+'" fill="var(--ok-bg)"/>' +
+      '<line x1="'+xThr+'" y1="'+yFor(100)+'" x2="'+xThr+'" y2="'+yFor(90)+'" stroke="#96650A" stroke-width="1" stroke-dasharray="3,3" opacity="0.6"/>';
+
+    var gridY = [0,80,90,100].map(function(v){
+      var y=yFor(v);
+      return '<line x1="'+padL+'" y1="'+y+'" x2="'+(W-padR)+'" y2="'+y+'" stroke="#fff" stroke-width="1.5"/>' +
+             '<text x="'+(padL-8)+'" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="#8A90A0" font-family="IBM Plex Mono, monospace">'+v+'%</text>';
+    }).join('');
+
+    var xTicks = [];
+    var tickStep = Math.max(1, Math.round(xMax/5));
+    for(var t=0;t<=xMax;t+=tickStep){
+      var x=xFor(t);
+      xTicks.push('<text x="'+x+'" y="'+(H-padB+18)+'" text-anchor="middle" font-size="10" fill="#8A90A0" font-family="IBM Plex Mono, monospace">'+t+'</text>');
+    }
+    var xAxisLabel = '<text x="'+(padL+innerW/2)+'" y="'+(H-4)+'" text-anchor="middle" font-size="10" fill="#8A90A0">počet testov</text>';
+
+    var dots = stats.map(function(s){
+      var x=xFor(s.count).toFixed(1), y=yFor(s.avg).toFixed(1);
+      var color = tierColor(tierFor(s.avg));
+      var nameShort = s.name.length>12 ? s.name.slice(0,11)+'…' : s.name;
+      return '<circle class="scatter-pt" cx="'+x+'" cy="'+y+'" r="6" fill="'+color+'" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>'+escapeHtml(s.name)+' — '+s.avg+' %, '+s.count+' test.</title></circle>' +
+        '<text x="'+x+'" y="'+(parseFloat(y)-10)+'" text-anchor="middle" font-size="9.5" fill="#5B6270" font-family="IBM Plex Sans, sans-serif">'+escapeHtml(nameShort)+'</text>';
+    }).join('');
+
+    return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">' + zones + gridY + dots + xTicks.join('') + xAxisLabel + '</svg>';
+  }
+
+
+  function csvEsc(val){ var s=String(val===undefined||val===null?'':val); if(/[;"\n\r]/.test(s)) s='"'+s.replace(/"/g,'""')+'"'; return s; }
+  function downloadCsv(lines, baseName){
+    var csvContent = '\uFEFF' + lines.join('\r\n');
+    var blob = new Blob([csvContent], {type:'text/csv;charset=utf-8;'});
+    var url = URL.createObjectURL(blob);
+    var a=document.createElement('a');
+    var stamp=new Date().toISOString().slice(0,16).replace(/[-:T]/g,'').replace(' ','-');
+    a.href=url; a.download=baseName+'-'+stamp+'.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
+  }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+
+  init();
+})();
+</script>
+</body>
+</html>
