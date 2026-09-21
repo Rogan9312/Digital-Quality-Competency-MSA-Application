@@ -16,8 +16,8 @@ Aplikácia je uzamknutá za prihlásením (Firebase Authentication, e-mail +
 heslo) — bez platného účtu sa neotvorí ani Test, ani Administrácia. Účty
 spravuje administrátor vo Firebase Console projektu.
 
-Dáta (fotky, správne odpovede, výsledky testov) sa ukladajú v Firebase
-(Firestore + Storage), takže sú **zdieľané medzi všetkými zariadeniami**
+Dáta (fotky, správne odpovede, výsledky testov) sa ukladajú v Cloud
+Firestore (Firebase), takže sú **zdieľané medzi všetkými zariadeniami**
 prihlásených používateľov, nie viazané na jeden prehliadač/počítač.
 
 ## Základný tok

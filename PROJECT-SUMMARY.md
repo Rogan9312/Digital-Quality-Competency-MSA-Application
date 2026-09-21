@@ -6,8 +6,8 @@ trénovanie a testovanie operátorov kvality v automotive výrobe: operátor
 hodnotí sériu fotiek defektov ako **OK / Hranične OK / NOK**, appka to
 porovná so správnymi odpoveďami, ktoré vopred nastaví admin, a zbiera
 výsledky do reportov a dashboardu pre manažment. Dáta sú zdieľané medzi
-zariadeniami cez Firebase (Firestore + Storage), prístup k appke je
-uzamknutý za Firebase Authentication (e-mail + heslo).
+zariadeniami cez Firebase (Firestore), prístup k appke je uzamknutý za
+Firebase Authentication (e-mail + heslo).
 
 - **Súbor:** `hodnotenie-defektov.html` (a identická kópia `index.html`
   pre GitHub Pages root) — jeden self-contained HTML súbor (~2 400+ riadkov),
@@ -17,13 +17,15 @@ uzamknutý za Firebase Authentication (e-mail + heslo).
   (predchádzajúca čisto offline IndexedDB verzia bola nahradená).
 - **Jazyk UI:** slovenčina (cieľová skupina: QM manažér a operátori
   v automotive výrobe, SK/CZ prostredie).
-- **Perzistencia:** Firebase — **Firestore** (dátové kolekcie), **Storage**
-  (fotky defektov ako súbory, nie base64/blob v DB) a **Authentication**
-  (e-mail/heslo login, gatuje CELÚ appku vrátane Test módu). Dáta sú tak
-  zdieľané medzi všetkými zariadeniami/prehliadačmi prihláseného tímu.
-  `firebaseConfig` je priamo v HTML (API key je verejný identifikátor
-  projektu, nie tajný kľúč — skutočná ochrana je cez Firestore/Storage
-  Security Rules, pozri nižšie).
+- **Perzistencia:** Firebase — **Firestore** (dátové kolekcie vrátane
+  samotných fotiek ako base64 reťazcov) a **Authentication** (e-mail/heslo
+  login, gatuje CELÚ appku vrátane Test módu). Zámerne **bez Firebase
+  Storage** — Storage od istého bodu vyžaduje platený Blaze tarif
+  (napojenú kartu), čo používateľ nechcel; fotky preto idú priamo do
+  Firestore dokumentov ako `data:` URL (base64 JPEG). Dáta sú tak zdieľané
+  medzi všetkými zariadeniami/prehliadačmi prihláseného tímu. `firebaseConfig`
+  je priamo v HTML (API key je verejný identifikátor projektu, nie tajný
+  kľúč — skutočná ochrana je cez Firestore Security Rules, pozri nižšie).
 
 ## Dátový model (Firestore kolekcie)
 Firestore kolekcie zámerne kopírujú pôvodné IndexedDB object stores 1:1
@@ -39,10 +41,11 @@ logiky appky sa vďaka tomu nemusel meniť):
   Jedna dávka = jedna sada fotiek + správnych odpovedí, ktorá sa dá opakovane
   zadávať viacerým operátorom. Práve jedna dávka je "aktívna" (servuje sa
   operátorom cez `kv.activeBatchId`), zvyšok je archív, ale stále dostupný.
-- `photos` (doc id = `id`) — `{id, name, photoURL, correctAnswer, order,
-  batchId}`. Samotný obrázok (JPEG, resized + kompresovaný v prehliadači)
-  je nahraný do **Firebase Storage** na cestu `photos/{batchId}/{id}.jpg`;
-  `photoURL` je jeho verejná download URL. `correctAnswer` je `null` kým ju
+- `photos` (doc id = `id`) — `{id, name, photoData, correctAnswer, order,
+  batchId}`. Samotný obrázok (JPEG, resized na 1400px + kompresovaný na
+  q=0.82 v prehliadači) je uložený priamo v `photoData` ako base64 `data:`
+  URL (žiadny Firebase Storage) — pri tejto kompresii sa bezpečne zmestí
+  pod Firestore limit 1 MiB na dokument. `correctAnswer` je `null` kým ju
   admin nedefinuje (`OK`/`HRANICNE`/`NOK`).
 - `attempts` (doc id = auto-generovaný Firestore ID, string) — jeden
   dokončený test jedného operátora: `{id, batchId, batchLabel,
@@ -130,17 +133,21 @@ Tri podzáložky:
      Nespôsobilý. Tento prah sa používa konzistentne vo všetkých grafoch.
 
 ## Dôležité implementačné detaily / gotchas
-- **Fotky idú do Firebase Storage, nie base64 do DB** — upload flow:
-  `canvas.toBlob()` (resize na 1400px, JPEG q=0.82, rovnako ako predtým) →
-  `storageRef.put(blob)` → `getDownloadURL()` → `photoURL` sa uloží do
-  Firestore doc. Fotky sa načítavajú/nahrávajú **sekvenčne** (jedna po
-  druhej cez Promise reťaz), nie paralelne — dôvod (Edge crash pri
-  paralelnom base64 loadingu) je historický z pôvodnej IndexedDB verzie,
-  ale sekvenčný upload zostal zachovaný.
+- **Fotky ako base64 priamo vo Firestore, zámerne bez Firebase Storage**
+  (Storage vyžaduje platený Blaze tarif, čo používateľ odmietol) — upload
+  flow: `canvas.toBlob()` (resize na 1400px, JPEG q=0.82) →
+  `blobToDataURL()` (`FileReader.readAsDataURL`) → výsledný `data:` URL
+  reťazec sa uloží priamo do poľa `photoData` vo Firestore dokumente. Fotky
+  sa načítavajú/nahrávajú **sekvenčne** (jedna po druhej cez Promise
+  reťaz), nie paralelne — historicky kvôli stabilite v Edge, platí aj tu.
+  Ak by v budúcnosti bolo treba viac/väčšie fotky, zváž návrat k Firebase
+  Storage (vyžaduje Blaze) alebo iné externé úložisko — base64 vo Firestore
+  má strop ~700 kB na fotku (1 MiB limit dokumentu mínus réžia base64
+  a ostatných polí).
 - **`p.url` je transientná vlastnosť, nie perzistovaná** — objekty fotiek
   v `photosCache`/`editingPhotos`/`activePhotos` majú `.url` (pre `<img
-  src>`) nastavené v JS na `photoURL`, ale do Firestore sa ukladá len
-  `photoURL`. Pri pridávaní nového miesta, kde appka číta/zapisuje fotky,
+  src>`) nastavené v JS na `photoData`, ale do Firestore sa ukladá len
+  `photoData`. Pri pridávaní nového miesta, kde appka číta/zapisuje fotky,
   dbaj na toto rozlíšenie.
 - **Cache-referencia bug** (opravené, stále platí): `photosCache[batchId]` a
   `editingPhotos`/`activePhotos` MUSIA byť tá istá referencia poľa, inak sa
@@ -149,9 +156,9 @@ Tri podzáložky:
   `editingPhotos = photosCache[batch.id]` (rovnaká referencia), nikdy
   `editingPhotos = []` ako samostatné pole.
 - **Chybové hlásenia namiesto ticha** — `window.addEventListener('unhandledrejection', ...)`
-  + `showStorageWarning()` banner pod topbarom, aby zlyhania Firestore/
-  Storage (offline, zlé Security Rules, vypršaný "test mode" na
-  Firestore databáze) boli viditeľné, nie tiché "nič sa nedeje".
+  + `showStorageWarning()` banner pod topbarom, aby zlyhania Firestore
+  (offline, zlé Security Rules, príliš veľká fotka nad Firestore limit)
+  boli viditeľné, nie tiché "nič sa nedeje".
 - **Dátová vrstva (`idbPut`/`idbGet`/`idbGetAll`/`idbDeleteKey`/`idbClear`)**
   — zámerne drží rovnaké mená a signatúry ako pôvodná IndexedDB verzia, len
   interne volá Firestore (`firestore.collection(store)...`). `KEYPATHS`
@@ -159,10 +166,10 @@ Tri podzáložky:
   Pri pridávaní novej kolekcie/store pridaj záznam do `KEYPATHS`, inak sa
   bude nesprávne predpokladať `id`.
 - **Firestore Security Rules** — appka spolieha na to, že prístup do
-  Firestore aj Storage majú **len prihlásení používatelia** (`request.auth
-  != null`). Toto sa nastavuje vo Firebase Console, appka to nevynucuje
-  sama (klient by šiel obísť). Bez správnych rules by ktokoľvek so
-  znalosťou `firebaseConfig` (verejný v HTML) mohol čítať/mazať dáta.
+  Firestore majú **len prihlásení používatelia** (`request.auth != null`).
+  Toto sa nastavuje vo Firebase Console, appka to nevynucuje sama (klient
+  by šiel obísť). Bez správnych rules by ktokoľvek so znalosťou
+  `firebaseConfig` (verejný v HTML) mohol čítať/mazať dáta.
 - **Archivácia** — `attempts.archived` flag, filtrovaný von zo všetkých
   reportov aj dashboardu (`!a.archived`), no dáta ostávajú v DB. Tlačidlá
   "Archivovať zobrazené" / "Obnoviť z archívu" pracujú nad aktuálne
@@ -176,24 +183,31 @@ Tri podzáložky:
   vytlačiť/exportovať ako PDF cez `window.print()` na reportoch aj detaile.
 
 ## Známe limity / veci, na ktoré upozorniť používateľa
-- Appka teraz **vyžaduje internetové pripojenie** (Firebase SDK + Firestore/
-  Storage) — predchádzajúca čisto offline IndexedDB verzia bez internetu
-  fungovala, táto nie.
+- Appka teraz **vyžaduje internetové pripojenie** (Firebase SDK + Firestore)
+  — predchádzajúca čisto offline IndexedDB verzia bez internetu fungovala,
+  táto nie.
+- **Žiadny Firebase Storage** (zámerne, kvôli vyhnutiu sa plateného Blaze
+  tarifu) — fotky sú base64 priamo vo Firestore dokumentoch, čo limituje
+  veľkosť jednej fotky na cca 700 kB po kompresii (bežne stačí, ale pri
+  extrémne detailných/veľkých fotkách môže upload zlyhať s chybou
+  presiahnutia limitu dokumentu — appka to zobrazí cez `showStorageWarning`
+  banner).
 - Účty (kto sa môže prihlásiť) sa spravujú výhradne vo Firebase Console —
   appka nemá vlastnú správu používateľov, pozvánky ani reset hesla.
 - Všetci prihlásení používatelia majú rovnaké oprávnenia (žiadne role
   admin/operátor na úrovni appky) — spoliehame sa na to, že len 4 dôveryhodní
   ľudia majú prístupové údaje.
-- Bezpečnosť dát stojí a padá na Firestore/Storage Security Rules
-  nastavených v konzole (pozri nižšie) — appka sama žiadne oprávnenia
-  nevynucuje na strane klienta.
+- Bezpečnosť dát stojí a padá na Firestore Security Rules nastavených
+  v konzole (pozri nižšie) — appka sama žiadne oprávnenia nevynucuje na
+  strane klienta.
 - Operátorov lightbox odhaľuje správnu odpoveď hneď po teste — ak sa
   tá istá dávka dáva viacerým operátorom postupne, prvý operátor môže
   odpovede prezradiť ďalším. Toto je vedomé rozhodnutie na žiadosť
   používateľa (pôvodne to bolo schválne skryté z opačného dôvodu).
 
 ## Firebase projekt (potrebné jednorazové nastavenie v konzole)
-Projekt: `digital-quality-plana` (console.firebase.google.com). Appka
+Projekt: `digital-quality-plana` (console.firebase.google.com), na
+bezplatnom **Spark** tarife (Storage/Blaze sa zámerne nepoužíva). Appka
 očakáva zapnuté a nastavené:
 - **Authentication** → Sign-in method → Email/Password povolené; 4 účty
   pridané ručne cez Authentication → Users → Add user.
@@ -204,17 +218,6 @@ očakáva zapnuté a nastavené:
   service cloud.firestore {
     match /databases/{database}/documents {
       match /{document=**} {
-        allow read, write: if request.auth != null;
-      }
-    }
-  }
-  ```
-- **Storage** → vytvorené, s obdobnými Security Rules:
-  ```
-  rules_version = '2';
-  service firebase.storage {
-    match /b/{bucket}/o {
-      match /{allPaths=**} {
         allow read, write: if request.auth != null;
       }
     }

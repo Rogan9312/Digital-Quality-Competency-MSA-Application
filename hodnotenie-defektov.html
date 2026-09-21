@@ -789,7 +789,6 @@
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-storage-compat.js"></script>
 <script>
 (function(){
   "use strict";
@@ -809,7 +808,6 @@
   firebase.initializeApp(firebaseConfig);
   var auth = firebase.auth();
   var firestore = firebase.firestore();
-  var storage = firebase.storage();
 
   /* =========================================================
      CONSTANTS
@@ -887,7 +885,7 @@
   var allAreas = [];          // {id, label, createdAt}
   var activeBatchId = null;   // batch served to operators
   var editingBatchId = null;  // batch currently shown in Setup
-  var photosCache = {};       // batchId -> [{id,name,photoURL,url,correctAnswer,order,batchId}]
+  var photosCache = {};       // batchId -> [{id,name,photoData,url,correctAnswer,order,batchId}]
   var editingPhotos = [];
   var activePhotos = [];
 
@@ -944,7 +942,7 @@
     if(photosCache[batchId]) return Promise.resolve(photosCache[batchId]);
     return idbGetAll('photos').then(function(all){
       var list = all.filter(function(p){ return p.batchId===batchId; }).sort(function(a,b){ return a.order-b.order; });
-      list.forEach(function(p){ p.url = p.photoURL; });
+      list.forEach(function(p){ p.url = p.photoData; });
       photosCache[batchId] = list;
       return list;
     });
@@ -1193,15 +1191,21 @@
     });
   }
 
+  function blobToDataURL(blob){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){ resolve(reader.result); };
+      reader.onerror = function(){ reject(reader.error || new Error('Čítanie súboru zlyhalo')); };
+      reader.readAsDataURL(blob);
+    });
+  }
+
   function addPhotoRecord(name, blob){
     var id = genId();
-    var storageRef = storage.ref().child('photos/' + editingBatchId + '/' + id + '.jpg');
-    return storageRef.put(blob).then(function(){
-      return storageRef.getDownloadURL();
-    }).then(function(downloadURL){
-      var record = { id:id, name:name, photoURL:downloadURL, correctAnswer:null, order:editingPhotos.length, batchId:editingBatchId };
+    return blobToDataURL(blob).then(function(dataURL){
+      var record = { id:id, name:name, photoData:dataURL, correctAnswer:null, order:editingPhotos.length, batchId:editingBatchId };
       return idbPut('photos', record).then(function(){
-        record.url = downloadURL;
+        record.url = dataURL;
         editingPhotos.push(record);
         renderSetupState();
         if(activeBatchId===editingBatchId) refreshTestModeEntry();
@@ -1253,11 +1257,8 @@
     Promise.all([idbGetAll('photos'), idbGetAll('attempts')]).then(function(res){
       var photos = res[0].filter(function(p){ return p.batchId===idToDelete; });
       var attempts = res[1].filter(function(a){ return a.batchId===idToDelete; });
-      var dels = photos.map(function(p){
-        return idbDeleteKey('photos', p.id).then(function(){
-          return p.photoURL ? storage.refFromURL(p.photoURL).delete().catch(function(){}) : null;
-        });
-      }).concat(attempts.map(function(a){ return idbDeleteKey('attempts', a.id); }));
+      var dels = photos.map(function(p){ return idbDeleteKey('photos', p.id); })
+        .concat(attempts.map(function(a){ return idbDeleteKey('attempts', a.id); }));
       return Promise.all(dels);
     }).then(function(){ return idbDeleteKey('batches', idToDelete); })
     .then(function(){
@@ -1356,7 +1357,7 @@
       var v = btn.getAttribute('data-def-verdict');
       var p = editingPhotos[defineIndex];
       p.correctAnswer = v;
-      idbPut('photos', { id:p.id, name:p.name, photoURL:p.photoURL, correctAnswer:p.correctAnswer, order:p.order, batchId:p.batchId });
+      idbPut('photos', { id:p.id, name:p.name, photoData:p.photoData, correctAnswer:p.correctAnswer, order:p.order, batchId:p.batchId });
       if(defineIndex < editingPhotos.length-1) defineIndex++;
       renderDefineScreen();
     });
