@@ -1,28 +1,34 @@
 # Hodnotenie defektov
 
-Jednosúborová webová aplikácia (bez backendu, bez build kroku) na
-trénovanie a testovanie operátorov kvality pri vizuálnej kontrole defektov
-vo výrobe. Operátor hodnotí sériu fotiek ako **OK / Hranične OK / NOK**,
-aplikácia to porovná so správnymi odpoveďami nastavenými administrátorom
-a výsledky zbiera do reportov a dashboardu.
+Jednosúborová webová aplikácia (bez build kroku) na trénovanie a testovanie
+operátorov kvality pri vizuálnej kontrole defektov vo výrobe. Operátor
+hodnotí sériu fotiek ako **OK / Hranične OK / NOK**, aplikácia to porovná
+so správnymi odpoveďami nastavenými administrátorom a výsledky zbiera do
+reportov a dashboardu.
 
 ## Spustenie
 
-Žiadna inštalácia. Stačí stiahnuť `hodnotenie-defektov.html` a otvoriť ho
-v prehliadači (odporúčané Chrome alebo Edge, aktuálna verzia).
+Žiadna inštalácia. Stačí otvoriť `hodnotenie-defektov.html` (alebo appku
+nasadenú na GitHub Pages) v prehliadači (odporúčané Chrome alebo Edge,
+aktuálna verzia) — vyžaduje sa internetové pripojenie.
 
-Dáta (fotky, správne odpovede, výsledky testov) sa ukladajú lokálne
-v prehliadači cez IndexedDB — sú viazané na konkrétny prehliadač
-a počítač, nesynchronizujú sa medzi zariadeniami.
+Aplikácia je uzamknutá za prihlásením (Firebase Authentication, e-mail +
+heslo) — bez platného účtu sa neotvorí ani Test, ani Administrácia. Účty
+spravuje administrátor vo Firebase Console projektu.
+
+Dáta (fotky, správne odpovede, výsledky testov) sa ukladajú v Firebase
+(Firestore + Storage), takže sú **zdieľané medzi všetkými zariadeniami**
+prihlásených používateľov, nie viazané na jeden prehliadač/počítač.
 
 ## Základný tok
 
-1. **Administrácia** (chránená heslom, nastaví sa pri prvom spustení)
-   → nahrať fotky defektov do dávky → definovať správne odpovede
-   → nastaviť dávku ako aktuálnu pre operátorov.
-2. **Test** (bez hesla) → operátor zadá meno a vyhodnotí fotky → na konci
-   vidí svoj výsledok.
-3. **Administrácia → Reporty / Dashboard** → sledovanie výsledkov
+1. **Prihlásenie** (e-mail + heslo, účet pridá administrátor vo Firebase
+   Console).
+2. **Administrácia** → nahrať fotky defektov do dávky → definovať správne
+   odpovede → nastaviť dávku ako aktuálnu pre operátorov.
+3. **Test** → operátor zadá meno a vyhodnotí fotky → na konci vidí svoj
+   výsledok.
+4. **Administrácia → Reporty / Dashboard** → sledovanie výsledkov
    jednotlivých operátorov aj vývoja v čase.
 
 Podrobný technický popis architektúry, dátového modelu a implementačných
@@ -33,6 +39,7 @@ ako kontext pre ďalší vývoj (napr. v Claude Code).
 
 Funkčný, priebežne dolaďovaný podľa reálneho používania. Známe limity:
 
-- žiadna synchronizácia dát medzi zariadeniami (čisto lokálne úložisko),
-- heslo administrátora je len jednoduchá ochrana na strane prehliadača,
-  nie skutočné zabezpečenie.
+- appka vyžaduje internetové pripojenie (Firebase),
+- prístup majú len účty pridané vo Firebase Console — appka nemá vlastnú
+  registráciu ani reset hesla,
+- žiadne rozlíšenie rolí — všetci prihlásení majú rovnaké oprávnenia.
