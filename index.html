@@ -214,7 +214,7 @@
 
   .result-actions{display:flex;gap:10px;margin-top:22px;justify-content:center;flex-wrap:wrap;}
 
-  #screen-admin-gate .card{max-width:400px;margin:0 auto;}
+  #screen-auth-gate .card{max-width:400px;margin:0 auto;}
   .lock-icon{
     width:36px;height:36px;border:1.5px solid var(--ink-faint);border-radius:50%;
     display:flex;align-items:center;justify-content:center;margin-bottom:16px;color:var(--ink-faint);font-size:16px;
@@ -391,7 +391,26 @@
 </style>
 </head>
 <body>
-<div class="app">
+
+<div id="screen-auth-gate" class="screen centerwrap is-active" style="min-height:100vh;">
+  <div class="card panel-narrow">
+    <div class="lock-icon">&#128274;</div>
+    <h2 class="scr-title">Prihlásenie</h2>
+    <p class="scr-sub" style="margin-bottom:18px;">Aplikácia je dostupná len pre autorizovaných používateľov.</p>
+    <div class="field">
+      <label for="field-auth-email">E-mail</label>
+      <input type="text" id="field-auth-email" autocomplete="username">
+    </div>
+    <div class="field">
+      <label for="field-auth-pass">Heslo</label>
+      <input type="password" id="field-auth-pass" autocomplete="current-password">
+    </div>
+    <div class="field-error" id="auth-error" style="display:none;"></div>
+    <button class="btn btn-primary btn-block" id="btn-auth-login">Prihlásiť sa</button>
+  </div>
+</div>
+
+<div class="app" id="app-root" style="display:none;">
 
   <div class="topbar">
     <div class="brand">
@@ -402,6 +421,7 @@
     <div class="topbar-nav">
       <button id="nav-test" class="is-active">Test</button>
       <button id="nav-admin">Administrácia</button>
+      <button id="btn-app-logout" title="Odhlásiť sa">Odhlásiť (<span id="topbar-user-email"></span>)</button>
     </div>
   </div>
 
@@ -481,43 +501,12 @@
     <!-- ========== ADMIN MODE ========== -->
     <section id="mode-admin" class="mode">
 
-      <section id="screen-admin-gate" class="screen centerwrap">
-        <div class="card panel-narrow">
-          <div class="lock-icon">&#128274;</div>
-          <div id="gate-setpass">
-            <h2 class="scr-title">Prvé spustenie</h2>
-            <p class="scr-sub" style="margin-bottom:18px;">Nastavte heslo správcu. Bude sa vyžadovať pri každom vstupe do administrácie.</p>
-            <div class="field"><label for="field-newpass1">Nové heslo</label><input type="password" id="field-newpass1"></div>
-            <div class="field">
-              <label for="field-newpass2">Potvrďte heslo</label>
-              <input type="password" id="field-newpass2">
-              <div class="field-error" id="setpass-error" style="display:none;"></div>
-            </div>
-            <button class="btn btn-primary btn-block" id="btn-set-password">Nastaviť heslo a pokračovať</button>
-          </div>
-          <div id="gate-login" style="display:none;">
-            <h2 class="scr-title">Heslo správcu</h2>
-            <p class="scr-sub" style="margin-bottom:18px;">Táto sekcia obsahuje správne odpovede a výsledky operátorov.</p>
-            <div class="field">
-              <label for="field-loginpass">Heslo</label>
-              <input type="password" id="field-loginpass">
-              <div class="field-error" id="login-error" style="display:none;">Nesprávne heslo.</div>
-            </div>
-            <button class="btn btn-primary btn-block" id="btn-login">Vstúpiť</button>
-          </div>
-        </div>
-      </section>
-
       <section id="admin-shell" class="screen">
         <div class="admin-subnav">
           <div class="tabs">
             <button id="atab-setup" class="is-active">Nastavenie testu</button>
             <button id="atab-reports">Reporty</button>
             <button id="atab-dashboard">Dashboard</button>
-          </div>
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-ghost btn-sm" id="btn-change-pass">Zmeniť heslo</button>
-            <button class="btn btn-ghost btn-sm" id="btn-logout">Odhlásiť</button>
           </div>
         </div>
 
@@ -797,9 +786,28 @@
   <button class="lb-nav next" id="lb-next" aria-label="Nasledujúca">&#8594;</button>
 </div>
 
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
 <script>
 (function(){
   "use strict";
+
+  /* =========================================================
+     FIREBASE INIT
+  ========================================================= */
+  var firebaseConfig = {
+    apiKey: "AIzaSyAHw36V_FjPlc4ONc-kZsKLUyYTaVt5jRk",
+    authDomain: "digital-quality-plana.firebaseapp.com",
+    projectId: "digital-quality-plana",
+    storageBucket: "digital-quality-plana.firebasestorage.app",
+    messagingSenderId: "316056939877",
+    appId: "1:316056939877:web:4a8628e4854391cc03058c",
+    measurementId: "G-X6S7RVNR9D"
+  };
+  firebase.initializeApp(firebaseConfig);
+  var auth = firebase.auth();
+  var firestore = firebase.firestore();
 
   /* =========================================================
      CONSTANTS
@@ -810,7 +818,10 @@
   var VERDICT_COLOR = { ok:'#1F7A54', warn:'#96650A', nok:'#AE2E22' };
 
   /* =========================================================
-     INDEXEDDB LAYER
+     FIRESTORE / STORAGE DATA LAYER
+     (drop-in replacement for the old IndexedDB layer — same
+     idbPut/idbGet/idbGetAll/idbDeleteKey/idbClear call shape,
+     so the rest of the app's business logic is unchanged)
   ========================================================= */
   function showStorageWarning(msg){
     var el = document.getElementById('storage-banner');
@@ -826,101 +837,45 @@
   window.addEventListener('unhandledrejection', function(event){
     console.error('Nezachytená chyba:', event.reason);
     var msg = (event.reason && event.reason.message) ? event.reason.message : String(event.reason);
-    showStorageWarning('Nastala chyba pri práci s dátami (' + msg + '). Skúste obnoviť stránku. Ak to pretrváva, prehliadač pravdepodobne blokuje lokálne úložisko (IndexedDB) — skúste iný prehliadač alebo vypnite prísne blokovanie súkromia/sledovania pre tento súbor.');
+    showStorageWarning('Nastala chyba pri práci s dátami (' + msg + '). Skúste obnoviť stránku. Ak to pretrváva, skontrolujte pripojenie na internet alebo Firestore/Storage pravidlá v konzole projektu.');
   });
 
-  var DB_NAME = 'qc-defekt-test-db';
-  var DB_VERSION = 3;
-  var dbPromise = new Promise(function(resolve, reject){
-    if(!window.indexedDB){
-      var e = new Error('IndexedDB nie je dostupné v tomto prehliadači/režime.');
-      showStorageWarning('Tento prehliadač alebo režim (napr. prísne súkromné prehliadanie, firemná politika) blokuje lokálne úložisko potrebné na uloženie fotiek a výsledkov. Skúste iný prehliadač (napr. Chrome) alebo bežné okno (nie InPrivate).');
-      reject(e);
-      return;
-    }
-    try{
-      var req = indexedDB.open(DB_NAME, DB_VERSION);
-      req.onupgradeneeded = function(e){
-        var db = e.target.result;
-        if(!db.objectStoreNames.contains('kv')) db.createObjectStore('kv', {keyPath:'key'});
-        if(!db.objectStoreNames.contains('photos')) db.createObjectStore('photos', {keyPath:'id'});
-        if(!db.objectStoreNames.contains('attempts')) db.createObjectStore('attempts', {keyPath:'id', autoIncrement:true});
-        if(!db.objectStoreNames.contains('batches')) db.createObjectStore('batches', {keyPath:'id'});
-        if(!db.objectStoreNames.contains('areas')) db.createObjectStore('areas', {keyPath:'id'});
-      };
-      req.onsuccess = function(e){ resolve(e.target.result); };
-      req.onerror = function(e){ reject(e.target.error || new Error('Chyba pri otváraní databázy')); };
-      req.onblocked = function(){
-        showStorageWarning('Databáza je blokovaná iným otvoreným oknom/kartou s touto appkou. Zatvorte ostatné karty s "Hodnotenie defektov" a obnovte túto stránku.');
-      };
-    }catch(err){ reject(err); }
-  });
+  var KEYPATHS = { kv:'key', photos:'id', attempts:'id', batches:'id', areas:'id' };
 
-  function idbTx(store, mode){ return dbPromise.then(function(db){ return db.transaction([store], mode||'readonly'); }); }
+  function fsConvert(data){
+    if(!data) return data;
+    Object.keys(data).forEach(function(k){
+      var v = data[k];
+      if(v && typeof v.toDate === 'function') data[k] = v.toDate();
+    });
+    return data;
+  }
   function idbPut(store, val){
-    return idbTx(store,'readwrite').then(function(t){ return new Promise(function(res,rej){
-      var r = t.objectStore(store).put(val);
-      r.onsuccess = function(){ res(r.result); };
-      r.onerror = function(){ rej(r.error); };
-    }); });
+    var keyField = KEYPATHS[store] || 'id';
+    var col = firestore.collection(store);
+    var ref = val[keyField] ? col.doc(String(val[keyField])) : col.doc();
+    if(!val[keyField]) val[keyField] = ref.id;
+    return ref.set(val).then(function(){ return val[keyField]; });
   }
   function idbGet(store, key){
-    return idbTx(store).then(function(t){ return new Promise(function(res,rej){
-      var r = t.objectStore(store).get(key);
-      r.onsuccess = function(){ res(r.result); };
-      r.onerror = function(){ rej(r.error); };
-    }); });
+    return firestore.collection(store).doc(String(key)).get().then(function(snap){
+      return snap.exists ? fsConvert(snap.data()) : undefined;
+    });
   }
   function idbGetAll(store){
-    return idbTx(store).then(function(t){ return new Promise(function(res,rej){
-      var r = t.objectStore(store).getAll();
-      r.onsuccess = function(){ res(r.result || []); };
-      r.onerror = function(){ rej(r.error); };
-    }); });
+    return firestore.collection(store).get().then(function(qs){
+      var out=[]; qs.forEach(function(d){ out.push(fsConvert(d.data())); }); return out;
+    });
   }
   function idbDeleteKey(store, key){
-    return idbTx(store,'readwrite').then(function(t){ return new Promise(function(res,rej){
-      var r = t.objectStore(store).delete(key);
-      r.onsuccess = function(){ res(); };
-      r.onerror = function(){ rej(r.error); };
-    }); });
+    return firestore.collection(store).doc(String(key)).delete();
   }
   function idbClear(store){
-    return idbTx(store,'readwrite').then(function(t){ return new Promise(function(res,rej){
-      var r = t.objectStore(store).clear();
-      r.onsuccess = function(){ res(); };
-      r.onerror = function(){ rej(r.error); };
-    }); });
-  }
-
-  /* =========================================================
-     PASSWORD HASHING (deterrent-level, not real security)
-  ========================================================= */
-  function randomSalt(){
-    if(window.crypto && crypto.getRandomValues){
-      var arr = new Uint8Array(16); crypto.getRandomValues(arr);
-      return Array.prototype.map.call(arr, function(b){ return b.toString(16).padStart(2,'0'); }).join('');
-    }
-    return Math.random().toString(16).slice(2) + Date.now().toString(16);
-  }
-  function fallbackHash(str){
-    var h1=0x811c9dc5, h2=0x811c9dc5;
-    for(var i=0;i<str.length;i++){
-      var c=str.charCodeAt(i);
-      h1=(h1^c)>>>0; h1=Math.imul(h1,16777619)>>>0;
-      h2=(h2^(c<<3))>>>0; h2=Math.imul(h2,2246822519)>>>0;
-    }
-    return h1.toString(16)+h2.toString(16);
-  }
-  function hashPassword(password, salt){
-    var input = salt + '::' + password;
-    if(window.crypto && window.crypto.subtle){
-      var enc = new TextEncoder().encode(input);
-      return crypto.subtle.digest('SHA-256', enc).then(function(digest){
-        return Array.prototype.map.call(new Uint8Array(digest), function(b){ return b.toString(16).padStart(2,'0'); }).join('');
-      }).catch(function(){ return fallbackHash(input); });
-    }
-    return Promise.resolve(fallbackHash(input));
+    return firestore.collection(store).get().then(function(qs){
+      var batch = firestore.batch();
+      qs.forEach(function(d){ batch.delete(d.ref); });
+      return batch.commit();
+    });
   }
 
   /* =========================================================
@@ -930,12 +885,9 @@
   var allAreas = [];          // {id, label, createdAt}
   var activeBatchId = null;   // batch served to operators
   var editingBatchId = null;  // batch currently shown in Setup
-  var photosCache = {};       // batchId -> [{id,name,blob,url,correctAnswer,order,batchId}]
+  var photosCache = {};       // batchId -> [{id,name,photoData,url,correctAnswer,order,batchId}]
   var editingPhotos = [];
   var activePhotos = [];
-
-  var adminAuthHash = null;
-  var adminAuthed = false;
 
   var currentAttempt = null;
   var defineIndex = 0;
@@ -990,43 +942,25 @@
     if(photosCache[batchId]) return Promise.resolve(photosCache[batchId]);
     return idbGetAll('photos').then(function(all){
       var list = all.filter(function(p){ return p.batchId===batchId; }).sort(function(a,b){ return a.order-b.order; });
-      list.forEach(function(p){ p.url = URL.createObjectURL(p.blob); });
+      list.forEach(function(p){ p.url = p.photoData; });
       photosCache[batchId] = list;
       return list;
     });
   }
 
   /* =========================================================
-     INIT + LEGACY MIGRATION (v1 -> batches)
+     INIT
   ========================================================= */
   function ensureBatchesExist(){
     return idbGetAll('batches').then(function(batches){
       if(batches.length>0){ allBatches = batches; return; }
-      return Promise.all([idbGetAll('photos'), idbGetAll('attempts'), idbGet('kv','testMeta')]).then(function(res){
-        var legacyPhotos = res[0]||[], legacyAttempts = res[1]||[], legacyMeta = res[2];
-        var hasLegacy = legacyPhotos.some(function(p){ return !p.batchId; }) || legacyAttempts.some(function(a){ return !a.batchId; });
-        if(!hasLegacy){
-          var fresh = { id:genId(), label:'Dávka 1', createdAt:new Date() };
-          return idbPut('batches', fresh).then(function(){
-            allBatches=[fresh];
-          });
-        }
-        var legacyBatch = { id:genId(), label:(legacyMeta && legacyMeta.batch) || 'Dávka 1', createdAt:new Date() };
-        var puts = [];
-        legacyPhotos.forEach(function(p){ if(!p.batchId){ p.batchId = legacyBatch.id; puts.push(idbPut('photos', p)); } });
-        legacyAttempts.forEach(function(a){ if(!a.batchId){ a.batchId = legacyBatch.id; a.batchLabel = legacyBatch.label; puts.push(idbPut('attempts', a)); } });
-        return idbPut('batches', legacyBatch).then(function(){ return Promise.all(puts); })
-          .then(function(){ return idbPut('kv', {key:'activeBatchId', value:legacyBatch.id}); })
-          .then(function(){ allBatches=[legacyBatch]; });
-      });
+      var fresh = { id:genId(), label:'Dávka 1', createdAt:new Date() };
+      return idbPut('batches', fresh).then(function(){ allBatches=[fresh]; });
     });
   }
 
   function init(){
-    idbGet('kv','adminAuth').then(function(rec){
-      adminAuthHash = rec || null;
-      return ensureBatchesExist();
-    }).then(function(){
+    ensureBatchesExist().then(function(){
       return idbGetAll('areas');
     }).then(function(areas){
       allAreas = areas || [];
@@ -1257,13 +1191,25 @@
     });
   }
 
+  function blobToDataURL(blob){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){ resolve(reader.result); };
+      reader.onerror = function(){ reject(reader.error || new Error('Čítanie súboru zlyhalo')); };
+      reader.readAsDataURL(blob);
+    });
+  }
+
   function addPhotoRecord(name, blob){
-    var record = { id:genId(), name:name, blob:blob, correctAnswer:null, order:editingPhotos.length, batchId:editingBatchId };
-    return idbPut('photos', record).then(function(){
-      record.url = URL.createObjectURL(blob);
-      editingPhotos.push(record);
-      renderSetupState();
-      if(activeBatchId===editingBatchId) refreshTestModeEntry();
+    var id = genId();
+    return blobToDataURL(blob).then(function(dataURL){
+      var record = { id:id, name:name, photoData:dataURL, correctAnswer:null, order:editingPhotos.length, batchId:editingBatchId };
+      return idbPut('photos', record).then(function(){
+        record.url = dataURL;
+        editingPhotos.push(record);
+        renderSetupState();
+        if(activeBatchId===editingBatchId) refreshTestModeEntry();
+      });
     });
   }
 
@@ -1411,7 +1357,7 @@
       var v = btn.getAttribute('data-def-verdict');
       var p = editingPhotos[defineIndex];
       p.correctAnswer = v;
-      idbPut('photos', { id:p.id, name:p.name, blob:p.blob, correctAnswer:p.correctAnswer, order:p.order, batchId:p.batchId });
+      idbPut('photos', { id:p.id, name:p.name, photoData:p.photoData, correctAnswer:p.correctAnswer, order:p.order, batchId:p.batchId });
       if(defineIndex < editingPhotos.length-1) defineIndex++;
       renderDefineScreen();
     });
@@ -1428,84 +1374,14 @@
   });
 
   /* =========================================================
-     ADMIN GATE
+     ADMIN SHELL (access already gated by Firebase Auth login)
   ========================================================= */
-  var screenGate=document.getElementById('screen-admin-gate'), adminShell=document.getElementById('admin-shell');
-  var gateSetpass=document.getElementById('gate-setpass'), gateLogin=document.getElementById('gate-login');
+  var adminShell=document.getElementById('admin-shell');
 
   function renderAdminGateOrShell(){
-    if(adminAuthed){
-      screenGate.classList.remove('is-active');
-      adminShell.classList.add('is-active');
-      showAdminPanel('setup');
-    } else {
-      adminShell.classList.remove('is-active');
-      screenGate.classList.add('is-active');
-      if(adminAuthHash){
-        gateSetpass.style.display='none'; gateLogin.style.display='block';
-        document.getElementById('field-loginpass').value='';
-        document.getElementById('login-error').style.display='none';
-      } else {
-        gateSetpass.style.display='block'; gateLogin.style.display='none';
-        document.getElementById('field-newpass1').value='';
-        document.getElementById('field-newpass2').value='';
-        document.getElementById('setpass-error').style.display='none';
-      }
-    }
+    adminShell.classList.add('is-active');
+    showAdminPanel('setup');
   }
-
-  document.getElementById('btn-set-password').addEventListener('click', function(){
-    var p1=document.getElementById('field-newpass1').value, p2=document.getElementById('field-newpass2').value;
-    var errEl=document.getElementById('setpass-error');
-    if(p1.length<4){ errEl.textContent='Heslo musí mať aspoň 4 znaky.'; errEl.style.display='block'; return; }
-    if(p1!==p2){ errEl.textContent='Heslá sa nezhodujú.'; errEl.style.display='block'; return; }
-    var salt=randomSalt();
-    hashPassword(p1,salt).then(function(hash){
-      var rec={key:'adminAuth', hash:hash, salt:salt};
-      return idbPut('kv',rec).then(function(){ adminAuthHash=rec; adminAuthed=true; renderAdminGateOrShell(); });
-    }).catch(function(err){
-      errEl.textContent = 'Nepodarilo sa uložiť heslo (' + (err && err.message ? err.message : err) + '). Prehliadač pravdepodobne blokuje lokálne úložisko — skúste iný prehliadač alebo bežné (nie súkromné) okno.';
-      errEl.style.display='block';
-    });
-  });
-
-  document.getElementById('btn-login').addEventListener('click', attemptLogin);
-  document.getElementById('field-loginpass').addEventListener('keydown', function(e){ if(e.key==='Enter') attemptLogin(); });
-  function attemptLogin(){
-    var pass=document.getElementById('field-loginpass').value;
-    hashPassword(pass, adminAuthHash.salt).then(function(hash){
-      if(hash===adminAuthHash.hash){ adminAuthed=true; renderAdminGateOrShell(); }
-      else {
-        var errEl = document.getElementById('login-error');
-        errEl.textContent = 'Nesprávne heslo.';
-        errEl.style.display='block';
-      }
-    }).catch(function(err){
-      var errEl = document.getElementById('login-error');
-      errEl.textContent = 'Nepodarilo sa overiť heslo (' + (err && err.message ? err.message : err) + ').';
-      errEl.style.display='block';
-    });
-  }
-
-  document.getElementById('btn-logout').addEventListener('click', function(){ adminAuthed=false; renderAdminGateOrShell(); });
-
-  document.getElementById('btn-change-pass').addEventListener('click', function(){
-    var current = prompt('Zadajte súčasné heslo:');
-    if(current===null) return;
-    hashPassword(current, adminAuthHash.salt).then(function(hash){
-      if(hash!==adminAuthHash.hash){ alert('Nesprávne súčasné heslo.'); return; }
-      var np1=prompt('Nové heslo (min. 4 znaky):');
-      if(np1===null) return;
-      if(np1.length<4){ alert('Heslo musí mať aspoň 4 znaky.'); return; }
-      var np2=prompt('Potvrďte nové heslo:');
-      if(np2!==np1){ alert('Heslá sa nezhodujú.'); return; }
-      var salt=randomSalt();
-      hashPassword(np1,salt).then(function(hash2){
-        var rec={key:'adminAuth', hash:hash2, salt:salt};
-        idbPut('kv',rec).then(function(){ adminAuthHash=rec; alert('Heslo bolo zmenené.'); });
-      });
-    });
-  });
 
   /* =========================================================
      TEST MODE: entry state
@@ -2379,7 +2255,44 @@
   }
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 
-  init();
+  /* =========================================================
+     TOP-LEVEL LOGIN GATE (Firebase Authentication)
+  ========================================================= */
+  var authGateEl = document.getElementById('screen-auth-gate');
+  var appRootEl = document.getElementById('app-root');
+  var authEmailField = document.getElementById('field-auth-email');
+  var authPassField = document.getElementById('field-auth-pass');
+  var authErrorEl = document.getElementById('auth-error');
+  var topbarUserEmailEl = document.getElementById('topbar-user-email');
+  var appInited = false;
+
+  function doAuthLogin(){
+    authErrorEl.style.display = 'none';
+    var email = authEmailField.value.trim();
+    var pass = authPassField.value;
+    if(!email || !pass){ authErrorEl.textContent='Zadajte e-mail aj heslo.'; authErrorEl.style.display='block'; return; }
+    auth.signInWithEmailAndPassword(email, pass).catch(function(err){
+      authErrorEl.textContent = 'Prihlásenie zlyhalo: ' + (err && err.message ? err.message : err);
+      authErrorEl.style.display = 'block';
+    });
+  }
+  document.getElementById('btn-auth-login').addEventListener('click', doAuthLogin);
+  authPassField.addEventListener('keydown', function(e){ if(e.key==='Enter') doAuthLogin(); });
+  document.getElementById('btn-app-logout').addEventListener('click', function(){ auth.signOut(); });
+
+  auth.onAuthStateChanged(function(user){
+    if(user){
+      authGateEl.classList.remove('is-active');
+      appRootEl.style.display = 'flex';
+      topbarUserEmailEl.textContent = user.email || '';
+      if(!appInited){ appInited = true; init(); }
+    } else {
+      appRootEl.style.display = 'none';
+      authGateEl.classList.add('is-active');
+      authEmailField.value=''; authPassField.value='';
+      authErrorEl.style.display='none';
+    }
+  });
 })();
 </script>
 </body>
