@@ -212,6 +212,9 @@
   .mark.hit{background:var(--ok);}
   .mark.miss{background:var(--nok);}
 
+  /* Fotky s výsledkami pre tlač — na obrazovke skryté, viditeľné len v @media print (pozri nižšie) */
+  .print-photo-grid{display:none;}
+
   .result-actions{display:flex;gap:10px;margin-top:22px;justify-content:center;flex-wrap:wrap;}
 
   #screen-auth-gate .card, #screen-admin-pin-gate .card{max-width:400px;margin:0 auto;}
@@ -389,6 +392,26 @@
     body{background:#fff;}
     .admin-panel,#screen-test-result{padding:0;overflow:visible;}
     table.rtable{font-size:11px;}
+
+    /* Na papieri sa nedá klikať na riadok a otvoriť fotku v lightboxe,
+       tak namiesto kompaktného zoznamu/tabuľky vytlačíme rovno mriežku
+       fotiek s výsledkami — 2 stĺpce, cca 4 fotky na stránku (A4). */
+    #res-list, #admin-attempt-detail table.rtable{display:none !important;}
+    .print-photo-grid{
+      display:grid; grid-template-columns:1fr 1fr; gap:8mm; margin-top:16px;
+    }
+    .print-photo-grid .ppg-card{
+      border:1.5px solid var(--line-strong); border-radius:4px; padding:8px;
+      break-inside:avoid; page-break-inside:avoid;
+    }
+    .print-photo-grid .ppg-card.is-hit{border-color:var(--ok-line);}
+    .print-photo-grid .ppg-card.is-miss{border-color:var(--nok-line);}
+    .print-photo-grid img{width:100%;height:75mm;object-fit:contain;display:block;margin-bottom:6px;}
+    .print-photo-grid .ppg-name{font-size:11px;font-weight:600;margin-bottom:4px;}
+    .print-photo-grid .ppg-line{font-size:11px;color:var(--ink-soft);margin-bottom:2px;}
+    .print-photo-grid .ppg-mark{font-size:11px;font-weight:700;margin-top:4px;}
+    .print-photo-grid .ppg-mark.hit{color:var(--ok);}
+    .print-photo-grid .ppg-mark.miss{color:var(--nok);}
   }
   @media (max-width:720px){
     .summary-row{grid-template-columns:repeat(2,1fr);}
@@ -496,6 +519,7 @@
             <div class="when" id="res-when"></div>
           </div>
           <ul class="verdict-list" id="res-list"></ul>
+          <div class="print-photo-grid" id="res-print-grid"></div>
           <div class="result-actions">
             <button class="btn btn-ghost" id="btn-print-my-result">Vytlačiť môj výsledok</button>
             <button class="btn btn-primary" id="btn-new-attempt">Nový test (ďalší operátor)</button>
@@ -816,6 +840,7 @@
               <thead><tr><th>#</th><th></th><th>Súbor</th><th>Odpoveď operátora</th><th>Správna odpoveď</th><th>Zhoda</th><th>Poznámka</th></tr></thead>
               <tbody id="detail-tbody"></tbody>
             </table>
+            <div class="print-photo-grid" id="detail-print-grid"></div>
           </div>
         </div>
 
@@ -1730,10 +1755,31 @@
   }
 
   /* =========================================================
-     TEST MODE: result screen (no correct-answer text shown)
+     TEST MODE: result screen (correct answer is revealed here too —
+     see lightbox comment; the printed version also needs it, since
+     paper can't be clicked to open the lightbox)
   ========================================================= */
   var resOpName=document.getElementById('res-op-name'), resPct=document.getElementById('res-pct'), resFrac=document.getElementById('res-frac'), resWhen=document.getElementById('res-when'), resList=document.getElementById('res-list');
+  var resPrintGrid=document.getElementById('res-print-grid');
   function scoreTier(pct){ return pct>=90?'tier-ok':(pct>=70?'tier-warn':'tier-nok'); }
+
+  /* Card used by the print-only photo grid (#res-print-grid, #detail-print-grid) —
+     on paper you can't click a row to open the lightbox, so the photo and both
+     verdicts need to be visible directly on the printed page. */
+  function buildPrintPhotoCard(idx, a, p){
+    var card=document.createElement('div');
+    card.className = 'ppg-card ' + (a.isCorrect ? 'is-hit' : 'is-miss');
+    var img=document.createElement('img'); img.src=p?p.url:''; img.alt=a.name;
+    var name=document.createElement('div'); name.className='ppg-name'; name.textContent=(idx+1)+'. '+a.name;
+    var given=document.createElement('div'); given.className='ppg-line';
+    given.textContent = 'Odpoveď: ' + VERDICT_LABEL[a.given];
+    var correct=document.createElement('div'); correct.className='ppg-line';
+    correct.textContent = 'Správne: ' + (a.correctAtTime ? VERDICT_LABEL[a.correctAtTime] : '—');
+    var mark=document.createElement('div'); mark.className='ppg-mark '+(a.isCorrect?'hit':'miss');
+    mark.textContent = a.isCorrect ? '✓ Zhoda' : '✕ Nezhoda';
+    card.appendChild(img); card.appendChild(name); card.appendChild(given); card.appendChild(correct); card.appendChild(mark);
+    return card;
+  }
 
   function renderResultScreen(record){
     resOpName.textContent = record.operatorName + (record.batchLabel ? (' · ' + record.batchLabel) : '');
@@ -1743,6 +1789,7 @@
     resWhen.textContent = new Date(record.finishedAt).toLocaleString('sk-SK');
 
     resList.innerHTML='';
+    resPrintGrid.innerHTML='';
     lightboxAnswers = record.answers;
     lightboxPhotos = activePhotos;
     record.answers.forEach(function(a, idx){
@@ -1758,6 +1805,7 @@
       var mark=document.createElement('span'); mark.className='mark '+(a.isCorrect?'hit':'miss'); mark.textContent=a.isCorrect?'✓':'✕';
       li.appendChild(img); li.appendChild(nameSpan); li.appendChild(mark);
       resList.appendChild(li);
+      resPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
     });
   }
 
@@ -1949,6 +1997,7 @@
   ========================================================= */
   var detOpName=document.getElementById('det-op-name'), detPct=document.getElementById('det-pct'), detFrac=document.getElementById('det-frac'), detWhen=document.getElementById('det-when');
   var detailTbody=document.getElementById('detail-tbody');
+  var detailPrintGrid=document.getElementById('detail-print-grid');
 
   function openAttemptDetail(rec){
     currentDetailAttempt = rec;
@@ -1963,6 +2012,7 @@
       lightboxPhotos = photos;
 
       detailTbody.innerHTML='';
+      detailPrintGrid.innerHTML='';
       rec.answers.forEach(function(a, idx){
         var p = photos.find(function(ph){ return ph.id===a.photoId; });
         var tr=document.createElement('tr');
@@ -1981,6 +2031,7 @@
         td5.appendChild(mark); tr.appendChild(td5);
         var td6=document.createElement('td'); td6.textContent=a.note||'—'; tr.appendChild(td6);
         detailTbody.appendChild(tr);
+        detailPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
       });
 
       showAdminPanel('detail');

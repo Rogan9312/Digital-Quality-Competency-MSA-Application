@@ -205,6 +205,14 @@ Tri podzáložky:
   `buildScatterChartSvg`, `buildPieChartSvg`).
 - **Print CSS** (`@media print`) skrýva toolbar/topbar/dropzone, appka sa dá
   vytlačiť/exportovať ako PDF cez `window.print()` na reportoch aj detaile.
+  Na výsledku operátora (`#screen-test-result`) aj v admin detaile pokusu
+  (`#admin-attempt-detail`) appka pri tlači nahradí kompaktný zoznam/tabuľku
+  fotiek (`#res-list`, `table.rtable`) väčšou 2-stĺpcovou mriežkou fotiek
+  s výsledkami (`.print-photo-grid`, id `res-print-grid`/`detail-print-grid`,
+  naplnené spoločnou funkciou `buildPrintPhotoCard()`) — na papieri sa
+  nedá kliknúť a otvoriť fotku v lightboxe, takže sa fotka aj obe hodnoty
+  (odpoveď/správna odpoveď) musia vytlačiť rovno viditeľné. Mriežka je
+  na obrazovke skrytá (`display:none`), zobrazí sa len cez `@media print`.
 
 ## Známe limity / veci, na ktoré upozorniť používateľa
 - Appka teraz **vyžaduje internetové pripojenie** (Firebase SDK + Firestore)
