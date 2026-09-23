@@ -70,7 +70,12 @@ logiky appky sa vďaka tomu nemusel meniť):
   `computeQaDateTo()`). `isActive` je nezávislý manuálny prepínač NAD
   RÁMEC dátumovej platnosti (obe podmienky musia platiť zároveň, aby sa
   alert operátorovi zobrazil — pozri `getPendingQualityAlerts()`).
-  Spravuje sa v Administrácii → záložka "Quality Alerty".
+  Spravuje sa v Administrácii → záložka "Quality Alerty". Náhľad fotky
+  v karte alertu (`.qa-card-thumb`, orezaný na výšku 120px) je klikateľný
+  → otvorí `#qa-lightbox` (samostatný jednoduchý fullscreen viewer,
+  oddelený od hlavného `#lightbox` pre fotky defektov, ktorý je viazaný
+  na verdikty/odpovede) s celou nahranou fotkou bez orezania
+  (`object-fit:contain`).
 - `qualityAlertAcks` (doc id = `id`) — kto videl/potvrdil ktorý Quality
   Alert: `{id, qualityAlertId, operatorName, ackedAt}`. Zapisuje sa pri
   kliknutí na "Rozumiem, pokračovať" na `#screen-quality-alert`. Zámerne

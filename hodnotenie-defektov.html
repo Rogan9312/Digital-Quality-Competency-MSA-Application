@@ -980,6 +980,16 @@
   <button class="lb-nav next" id="lb-next" aria-label="Nasledujúca">&#8594;</button>
 </div>
 
+<div class="lightbox" id="qa-lightbox" style="display:none;">
+  <button class="lb-close" id="qa-lightbox-close" aria-label="Zavrieť" type="button">&times;</button>
+  <div class="lb-body">
+    <img id="qa-lightbox-img" src="" alt="">
+    <div class="lb-meta">
+      <div class="lb-name" id="qa-lightbox-name"></div>
+    </div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
@@ -1781,6 +1791,9 @@
       var card=document.createElement('div'); card.className='qa-card';
       if(qa.imageData){
         var thumb=document.createElement('img'); thumb.className='qa-card-thumb'; thumb.src=qa.imageData; thumb.alt=qa.title;
+        thumb.style.cursor='pointer';
+        thumb.title='Kliknutím zobrazíte fotku na celú obrazovku';
+        thumb.addEventListener('click', function(){ openQaLightbox(qa); });
         card.appendChild(thumb);
       }
       var head=document.createElement('div'); head.className='qa-card-head';
@@ -1833,6 +1846,26 @@
     });
   }
   resetQaForm();
+
+  /* Simple full-screen viewer for a Quality Alert photo — separate from the
+     main defect-photo lightbox (which is tied to verdicts/answers), reuses
+     the same .lightbox/.lb-body CSS for a consistent look. */
+  var qaLightboxEl = document.getElementById('qa-lightbox');
+  var qaLightboxImg = document.getElementById('qa-lightbox-img');
+  var qaLightboxName = document.getElementById('qa-lightbox-name');
+  function openQaLightbox(qa){
+    qaLightboxImg.src = qa.imageData;
+    qaLightboxImg.alt = qa.title;
+    qaLightboxName.textContent = qa.title;
+    qaLightboxEl.style.display = 'flex';
+  }
+  function closeQaLightbox(){ qaLightboxEl.style.display = 'none'; }
+  document.getElementById('qa-lightbox-close').addEventListener('click', closeQaLightbox);
+  qaLightboxEl.addEventListener('click', function(e){ if(e.target===qaLightboxEl) closeQaLightbox(); });
+  document.addEventListener('keydown', function(e){
+    if(qaLightboxEl.style.display==='none' || !qaLightboxEl.style.display) return;
+    if(e.key==='Escape') closeQaLightbox();
+  });
 
   /* =========================================================
      ADMIN: DEFINE CORRECT ANSWERS
