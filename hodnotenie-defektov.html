@@ -283,6 +283,17 @@
   .badge.nok{background:var(--nok-bg);color:var(--nok);}
   .badge.pending{background:#EDEFF2;color:var(--ink-faint);}
   .badge.active{background:var(--ok-bg);color:var(--ok);}
+  .badge.inactive{background:#EDEFF2;color:var(--ink-faint);}
+  .badge-toggle{cursor:pointer;border:none;font-family:var(--font-mono);}
+  .badge-toggle:hover{opacity:0.82;}
+
+  .qa-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-m);padding:14px 16px;margin-bottom:10px;}
+  .qa-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;}
+  .qa-card-head strong{font-size:14px;}
+  .qa-card-meta{font-size:12px;color:var(--ink-soft);margin-bottom:6px;}
+  .qa-card-desc{font-size:13px;color:var(--ink);margin-bottom:10px;white-space:pre-wrap;}
+  .qa-card-actions{display:flex;gap:8px;}
+  .qa-card-thumb{width:100%;max-height:120px;object-fit:cover;border-radius:4px;margin-bottom:8px;display:block;}
 
   .section-gap{margin-top:30px;}
   .empty-state{text-align:center;padding:50px 20px;color:var(--ink-soft);font-size:13.5px;}
@@ -480,7 +491,10 @@
       <section id="screen-test-start" class="screen centerwrap">
         <div class="panel-narrow card">
           <h2 class="scr-title">Nový test</h2>
-          <p class="scr-sub" id="test-start-sub" style="margin-bottom:20px;">Zadajte svoje meno a spustite vyhodnotenie fotiek.</p>
+          <p class="scr-sub" id="test-start-sub" style="margin-bottom:20px;">Priložte kartu, alebo zadajte svoje meno ručne a spustite vyhodnotenie fotiek.</p>
+          <input type="text" id="field-badge-scan" autocomplete="off" aria-hidden="true"
+            style="position:absolute;opacity:0;height:1px;width:1px;overflow:hidden;pointer-events:none;">
+          <div class="field-error" id="badge-scan-msg" style="display:none;"></div>
           <div class="field">
             <label for="field-op-name">Meno operátora</label>
             <input type="text" id="field-op-name" list="operator-history" placeholder="napr. Ján Novák" autocomplete="off">
@@ -488,6 +502,16 @@
             <div class="field-error" id="op-name-error" style="display:none;">Zadajte prosím meno.</div>
           </div>
           <button class="btn btn-primary btn-block" id="btn-begin-test">Spustiť test</button>
+        </div>
+      </section>
+
+      <section id="screen-quality-alert" class="screen centerwrap">
+        <div class="panel-narrow card" style="max-width:480px;text-align:center;">
+          <div style="font-size:11px;color:var(--warn);font-weight:700;letter-spacing:0.4px;margin-bottom:10px;">QUALITY ALERT</div>
+          <img id="qa-screen-img" src="" alt="" style="width:100%;border-radius:6px;margin-bottom:14px;display:none;">
+          <h2 class="scr-title" id="qa-screen-title"></h2>
+          <p class="scr-sub" id="qa-screen-desc" style="margin:10px 0 20px 0;white-space:pre-wrap;text-align:left;"></p>
+          <button class="btn btn-primary btn-block" id="btn-qa-continue">Rozumiem, pokračovať</button>
         </div>
       </section>
 
@@ -583,6 +607,8 @@
         <div class="admin-subnav">
           <div class="tabs">
             <button id="atab-setup" class="is-active">Nastavenie testu</button>
+            <button id="atab-operators">Operátori</button>
+            <button id="atab-qalerts">Quality Alerty</button>
             <button id="atab-reports">Reporty</button>
             <button id="atab-dashboard">Dashboard</button>
           </div>
@@ -669,6 +695,90 @@
             <button class="verdict-btn nok" data-def-verdict="NOK">Správne: NOK <span class="kb">3</span></button>
           </div>
           <div class="filmstrip-wrap"><div class="filmstrip" id="d-filmstrip"></div></div>
+        </div>
+
+        <!-- OPERATORS PANEL -->
+        <div id="admin-operators" class="admin-panel">
+          <div class="admin-panel-wrap">
+            <div class="step-block">
+              <h3>Operátori a karty</h3>
+              <p class="step-sub">Priradenie RFID/NFC karty (čítačka funguje ako klávesnica) k menu operátora — na štarte testu potom stačí priložiť kartu namiesto písania mena.</p>
+
+              <div class="toolbar" style="align-items:flex-end;">
+                <div class="field">
+                  <label for="field-operator-name">Meno operátora</label>
+                  <input type="text" id="field-operator-name" placeholder="napr. Ján Novák">
+                </div>
+                <div class="field">
+                  <label for="field-operator-badge">Badge ID</label>
+                  <input type="text" id="field-operator-badge" placeholder="napíšte, alebo priložte kartu do tohto poľa" autocomplete="off">
+                </div>
+                <button class="btn btn-primary btn-sm" id="btn-save-operator">+ Nový operátor</button>
+                <button class="btn btn-ghost btn-sm" id="btn-cancel-operator-edit" style="display:none;">Zrušiť úpravu</button>
+              </div>
+              <div class="field-error" id="operator-form-error" style="display:none;"></div>
+
+              <table class="rtable">
+                <thead><tr><th>Meno</th><th>Badge ID</th><th></th></tr></thead>
+                <tbody id="operators-tbody"></tbody>
+              </table>
+              <div class="empty-state" id="operators-empty" style="display:none;">Zatiaľ žiadni operátori. Pridajte prvého vyššie.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- QUALITY ALERTS PANEL -->
+        <div id="admin-qalerts" class="admin-panel">
+          <div class="admin-panel-wrap" style="max-width:760px;">
+            <div class="step-block">
+              <h3>Quality Alert</h3>
+              <p class="step-sub">Zobrazí sa operátorovi ako medzikrok pred testom, ak je aktívny, v dátumovej platnosti a patrí k sekcii aktuálnej dávky.</p>
+
+              <div class="field">
+                <label for="field-qa-area">Sekcia</label>
+                <select id="field-qa-area"></select>
+              </div>
+              <div class="field">
+                <label for="field-qa-title">Názov</label>
+                <input type="text" id="field-qa-title" placeholder="napr. Zvýšený výskyt trhlín na zvare">
+              </div>
+              <div class="field">
+                <label for="field-qa-desc">Popis</label>
+                <textarea id="field-qa-desc" rows="3" style="width:100%;padding:10px 11px;border:1px solid var(--line);border-radius:var(--radius-s);font-size:14px;font-family:inherit;resize:vertical;"></textarea>
+              </div>
+              <div class="field">
+                <label>Fotka (nepovinné)</label>
+                <div class="dropzone" id="qa-dropzone">
+                  <div class="icon">&#8593;</div>
+                  <strong>Kliknite pre výber fotky</strong>
+                  <span>alebo ju sem pretiahnite &mdash; JPG, PNG</span>
+                  <input type="file" id="qa-file-input" accept="image/*">
+                </div>
+                <div class="thumb-grid" id="qa-thumb-preview" style="max-height:120px;"></div>
+              </div>
+              <div class="row-between" style="gap:14px;flex-wrap:wrap;align-items:flex-start;">
+                <div class="field" style="flex:1;min-width:160px;">
+                  <label for="field-qa-datefrom">Dátum vystavenia</label>
+                  <input type="date" id="field-qa-datefrom">
+                </div>
+                <div class="field" style="flex:1;min-width:160px;">
+                  <label for="field-qa-duration">Platnosť (dní)</label>
+                  <input type="number" id="field-qa-duration" min="1" value="30">
+                </div>
+              </div>
+              <div class="field-error" id="qalert-form-error" style="display:none;"></div>
+              <div style="display:flex;gap:8px;">
+                <button class="btn btn-primary" id="btn-save-qalert">+ Nový Quality Alert</button>
+                <button class="btn btn-ghost" id="btn-cancel-qalert-edit" style="display:none;">Zrušiť úpravu</button>
+              </div>
+            </div>
+
+            <div class="step-block section-gap">
+              <h3>Existujúce Quality Alerty</h3>
+              <div id="qalerts-list"></div>
+              <div class="empty-state" id="qalerts-empty" style="display:none;">Zatiaľ žiadne Quality Alerty.</div>
+            </div>
+          </div>
         </div>
 
         <!-- REPORTS PANEL -->
@@ -923,7 +1033,7 @@
     showStorageWarning('Nastala chyba pri práci s dátami (' + msg + '). Skúste obnoviť stránku. Ak to pretrváva, skontrolujte pripojenie na internet alebo Firestore/Storage pravidlá v konzole projektu.');
   });
 
-  var KEYPATHS = { kv:'key', photos:'id', attempts:'id', batches:'id', areas:'id' };
+  var KEYPATHS = { kv:'key', photos:'id', attempts:'id', batches:'id', areas:'id', operators:'id', qualityAlerts:'id' };
 
   function fsConvert(data){
     if(!data) return data;
@@ -1006,6 +1116,14 @@
   var adminPinHash = null;    // {key:'adminPin', hash, salt} loaded from Firestore, or null if not set yet
   var adminPinVerified = false;
 
+  var allOperators = [];      // {id, badgeId, name, createdAt} — RFID/NFC card → operator name
+  var editingOperatorId = null;
+
+  var allQualityAlerts = [];  // {id, areaId, title, description, imageData, dateFrom, durationDays, isActive, createdAt}
+  var editingQualityAlertId = null;
+  var qaPendingImageData = null; // base64 dataURL staged in the Quality Alert form, null = no photo
+  var pendingAlertsQueue = []; // quality alerts still to show before the current attempt's eval screen
+
   var currentAttempt = null;
   var defineIndex = 0;
   var attemptsCache = [];
@@ -1032,6 +1150,7 @@
   var screensTest = {
     empty: document.getElementById('screen-test-empty'),
     start: document.getElementById('screen-test-start'),
+    alert: document.getElementById('screen-quality-alert'),
     eval: document.getElementById('screen-test-eval'),
     result: document.getElementById('screen-test-result')
   };
@@ -1089,10 +1208,12 @@
       activeBatchId = rec ? rec.value : (allBatches[0] ? allBatches[0].id : null);
       if(activeBatchId && !allBatches.some(function(b){ return b.id===activeBatchId; })) activeBatchId = allBatches[0] ? allBatches[0].id : null;
       editingBatchId = activeBatchId || (allBatches[0] ? allBatches[0].id : null);
-      return Promise.all([getPhotosForBatch(editingBatchId), getPhotosForBatch(activeBatchId)]);
+      return Promise.all([getPhotosForBatch(editingBatchId), getPhotosForBatch(activeBatchId), idbGetAll('operators'), idbGetAll('qualityAlerts')]);
     }).then(function(res){
       editingPhotos = res[0];
       activePhotos = (activeBatchId===editingBatchId) ? editingPhotos : res[1];
+      allOperators = res[2] || [];
+      allQualityAlerts = res[3] || [];
       refreshBatchSelectors();
       renderSetupState();
       refreshTestModeEntry();
@@ -1161,6 +1282,7 @@
     topbarMeta.textContent = activeBatchId ? currentBatchLabel(activeBatchId) : '';
 
     refreshDashboardFilters();
+    refreshQaAreaSelect();
   }
 
   areaSelect.addEventListener('change', function(){
@@ -1280,9 +1402,10 @@
     if(text){ var span=document.createElement('span'); span.className='progress-text'; span.style.marginLeft='10px'; span.textContent=text; host.appendChild(span); }
   }
 
-  function loadAndResize(file){
+  /* Generic sequential/canvas-resize pipeline, shared by batch defect photos
+     and the Quality Alert photo — resolves with a resized+compressed Blob. */
+  function resizeImageToBlob(file, maxDim, quality){
     return new Promise(function(resolve, reject){
-      var maxDim = 1400;
       function drawAndStore(source, w, h){
         try{
           var scale = Math.min(1, maxDim/Math.max(w,h));
@@ -1294,8 +1417,8 @@
           if(source.close) source.close();
           canvas.toBlob(function(blob){
             if(!blob){ reject(new Error('toBlob failed')); return; }
-            addPhotoRecord(file.name, blob).then(resolve).catch(reject);
-          }, 'image/jpeg', 0.82);
+            resolve(blob);
+          }, 'image/jpeg', quality);
         }catch(err){ reject(err); }
       }
       if(window.createImageBitmap){
@@ -1308,6 +1431,12 @@
         img.onerror = function(err){ URL.revokeObjectURL(objectUrl); reject(err || new Error('image load failed')); };
         img.src = objectUrl;
       }
+    });
+  }
+
+  function loadAndResize(file){
+    return resizeImageToBlob(file, 1400, 0.82).then(function(blob){
+      return addPhotoRecord(file.name, blob);
     });
   }
 
@@ -1400,14 +1529,298 @@
   });
 
   /* =========================================================
+     ADMIN: OPERATORS (RFID/NFC badge → operator name)
+  ========================================================= */
+  var operatorsTbody = document.getElementById('operators-tbody');
+  var operatorsEmpty = document.getElementById('operators-empty');
+  var fieldOperatorName = document.getElementById('field-operator-name');
+  var fieldOperatorBadge = document.getElementById('field-operator-badge');
+  var btnSaveOperator = document.getElementById('btn-save-operator');
+  var btnCancelOperatorEdit = document.getElementById('btn-cancel-operator-edit');
+  var operatorFormError = document.getElementById('operator-form-error');
+
+  function renderOperatorsList(){
+    operatorsTbody.innerHTML='';
+    var sorted = allOperators.slice().sort(function(a,b){ return a.name.localeCompare(b.name,'sk'); });
+    operatorsEmpty.style.display = sorted.length===0 ? 'block' : 'none';
+    sorted.forEach(function(op){
+      var tr=document.createElement('tr');
+      var td1=document.createElement('td'); td1.textContent=op.name; tr.appendChild(td1);
+      var td2=document.createElement('td'); var code=document.createElement('span');
+      code.style.fontFamily='var(--font-mono)'; code.textContent=op.badgeId;
+      td2.appendChild(code); tr.appendChild(td2);
+      var td3=document.createElement('td'); td3.style.whiteSpace='nowrap';
+      var editBtn=document.createElement('button'); editBtn.className='btn btn-ghost btn-sm'; editBtn.textContent='Upraviť'; editBtn.style.marginRight='6px';
+      editBtn.addEventListener('click', function(){ startEditOperator(op); });
+      var delBtn=document.createElement('button'); delBtn.className='btn btn-danger btn-sm'; delBtn.textContent='Zmazať';
+      delBtn.addEventListener('click', function(){
+        if(!confirm('Naozaj zmazať operátora "' + op.name + '"?')) return;
+        idbDeleteKey('operators', op.id).then(function(){
+          allOperators = allOperators.filter(function(x){ return x.id!==op.id; });
+          if(editingOperatorId===op.id) resetOperatorForm();
+          renderOperatorsList();
+        });
+      });
+      td3.appendChild(editBtn); td3.appendChild(delBtn); tr.appendChild(td3);
+      operatorsTbody.appendChild(tr);
+    });
+  }
+
+  function startEditOperator(op){
+    editingOperatorId = op.id;
+    fieldOperatorName.value = op.name;
+    fieldOperatorBadge.value = op.badgeId;
+    btnSaveOperator.textContent = 'Uložiť zmeny';
+    btnCancelOperatorEdit.style.display = 'inline-block';
+    operatorFormError.style.display = 'none';
+    fieldOperatorName.focus();
+  }
+  function resetOperatorForm(){
+    editingOperatorId = null;
+    fieldOperatorName.value=''; fieldOperatorBadge.value='';
+    btnSaveOperator.textContent = '+ Nový operátor';
+    btnCancelOperatorEdit.style.display = 'none';
+    operatorFormError.style.display = 'none';
+  }
+  btnCancelOperatorEdit.addEventListener('click', resetOperatorForm);
+
+  function saveOperatorForm(){
+    var name = fieldOperatorName.value.trim();
+    var badgeId = fieldOperatorBadge.value.trim();
+    if(!name){ operatorFormError.textContent='Zadajte meno operátora.'; operatorFormError.style.display='block'; return; }
+    if(!badgeId){ operatorFormError.textContent='Zadajte alebo priložte badge ID.'; operatorFormError.style.display='block'; return; }
+    var dup = allOperators.find(function(o){ return o.badgeId===badgeId && o.id!==editingOperatorId; });
+    if(dup){ operatorFormError.textContent='Táto karta je už priradená operátorovi "' + dup.name + '".'; operatorFormError.style.display='block'; return; }
+    operatorFormError.style.display='none';
+
+    var existing = editingOperatorId ? allOperators.find(function(o){ return o.id===editingOperatorId; }) : null;
+    var record = {
+      id: editingOperatorId || genId(),
+      name: name, badgeId: badgeId,
+      createdAt: existing ? existing.createdAt : new Date()
+    };
+    idbPut('operators', record).then(function(){
+      if(editingOperatorId){
+        var idx = allOperators.findIndex(function(o){ return o.id===editingOperatorId; });
+        if(idx>=0) allOperators[idx]=record;
+      } else {
+        allOperators.push(record);
+      }
+      resetOperatorForm();
+      renderOperatorsList();
+    });
+  }
+  btnSaveOperator.addEventListener('click', saveOperatorForm);
+
+  /* Admin badge field: card readers act as a keyboard, typing the badge ID
+     directly into whichever field has focus, then sending Enter — no extra
+     wiring needed to fill the field itself, just a nicer Enter behaviour. */
+  fieldOperatorBadge.addEventListener('keydown', function(e){
+    if(e.key!=='Enter') return;
+    e.preventDefault();
+    if(fieldOperatorName.value.trim()) saveOperatorForm(); else fieldOperatorName.focus();
+  });
+  fieldOperatorName.addEventListener('keydown', function(e){
+    if(e.key!=='Enter') return;
+    e.preventDefault();
+    if(fieldOperatorBadge.value.trim()) saveOperatorForm(); else fieldOperatorBadge.focus();
+  });
+
+  /* =========================================================
+     ADMIN: QUALITY ALERTS
+  ========================================================= */
+  var qaAreaSelect = document.getElementById('field-qa-area');
+  var qaTitleField = document.getElementById('field-qa-title');
+  var qaDescField = document.getElementById('field-qa-desc');
+  var qaDateFromField = document.getElementById('field-qa-datefrom');
+  var qaDurationField = document.getElementById('field-qa-duration');
+  var qaDropzone = document.getElementById('qa-dropzone');
+  var qaFileInput = document.getElementById('qa-file-input');
+  var qaThumbPreview = document.getElementById('qa-thumb-preview');
+  var btnSaveQalert = document.getElementById('btn-save-qalert');
+  var btnCancelQalertEdit = document.getElementById('btn-cancel-qalert-edit');
+  var qalertFormError = document.getElementById('qalert-form-error');
+  var qalertsList = document.getElementById('qalerts-list');
+  var qalertsEmpty = document.getElementById('qalerts-empty');
+
+  function toDateInputValue(d){
+    d = new Date(d);
+    var mm = String(d.getMonth()+1).padStart(2,'0');
+    var dd = String(d.getDate()).padStart(2,'0');
+    return d.getFullYear() + '-' + mm + '-' + dd;
+  }
+  function computeQaDateTo(qa){
+    var from = new Date(qa.dateFrom); from.setHours(0,0,0,0);
+    var to = new Date(from); to.setDate(to.getDate() + (qa.durationDays||30));
+    return to;
+  }
+
+  function refreshQaAreaSelect(){
+    if(!qaAreaSelect) return;
+    var prevVal = qaAreaSelect.value;
+    qaAreaSelect.innerHTML = '';
+    sortedAreas().forEach(function(a){
+      var opt=document.createElement('option'); opt.value=a.id; opt.textContent=a.label;
+      qaAreaSelect.appendChild(opt);
+    });
+    var stillValid = Array.prototype.some.call(qaAreaSelect.options, function(o){ return o.value===prevVal; });
+    qaAreaSelect.value = stillValid ? prevVal : (qaAreaSelect.options[0] ? qaAreaSelect.options[0].value : '');
+  }
+
+  function renderQaThumbPreview(){
+    qaThumbPreview.innerHTML='';
+    if(qaPendingImageData){
+      var img=document.createElement('img'); img.src=qaPendingImageData; img.alt='Náhľad Quality Alertu';
+      qaThumbPreview.appendChild(img);
+    }
+  }
+
+  qaDropzone.addEventListener('click', function(){ qaFileInput.click(); });
+  qaDropzone.addEventListener('dragover', function(e){ e.preventDefault(); qaDropzone.classList.add('is-drag'); });
+  qaDropzone.addEventListener('dragleave', function(){ qaDropzone.classList.remove('is-drag'); });
+  qaDropzone.addEventListener('drop', function(e){ e.preventDefault(); qaDropzone.classList.remove('is-drag'); handleQaFile(e.dataTransfer.files[0]); });
+  qaFileInput.addEventListener('change', function(e){ handleQaFile(e.target.files[0]); qaFileInput.value=''; });
+
+  function handleQaFile(file){
+    if(!file || file.type.indexOf('image/')!==0) return;
+    qaDropzone.classList.add('is-loading');
+    resizeImageToBlob(file, 1400, 0.82).then(function(blob){ return blobToDataURL(blob); })
+      .then(function(dataURL){ qaPendingImageData = dataURL; renderQaThumbPreview(); })
+      .catch(function(err){ console.error('Chyba pri spracovaní fotky Quality Alertu', err); })
+      .then(function(){ qaDropzone.classList.remove('is-loading'); });
+  }
+
+  function resetQaForm(){
+    editingQualityAlertId = null;
+    refreshQaAreaSelect();
+    qaTitleField.value=''; qaDescField.value='';
+    qaDateFromField.value = toDateInputValue(new Date());
+    qaDurationField.value = 30;
+    qaPendingImageData = null;
+    renderQaThumbPreview();
+    btnSaveQalert.textContent = '+ Nový Quality Alert';
+    btnCancelQalertEdit.style.display = 'none';
+    qalertFormError.style.display = 'none';
+  }
+  btnCancelQalertEdit.addEventListener('click', resetQaForm);
+
+  function startEditQualityAlert(qa){
+    editingQualityAlertId = qa.id;
+    refreshQaAreaSelect();
+    qaAreaSelect.value = qa.areaId || '';
+    qaTitleField.value = qa.title;
+    qaDescField.value = qa.description || '';
+    qaDateFromField.value = toDateInputValue(qa.dateFrom);
+    qaDurationField.value = qa.durationDays || 30;
+    qaPendingImageData = qa.imageData || null;
+    renderQaThumbPreview();
+    btnSaveQalert.textContent = 'Uložiť zmeny';
+    btnCancelQalertEdit.style.display = 'inline-block';
+    qalertFormError.style.display = 'none';
+    document.getElementById('admin-qalerts').scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  btnSaveQalert.addEventListener('click', function(){
+    var areaId = qaAreaSelect.value || null;
+    var title = qaTitleField.value.trim();
+    var desc = qaDescField.value.trim();
+    var dateFromVal = qaDateFromField.value;
+    var duration = parseInt(qaDurationField.value, 10);
+    if(!areaId){ qalertFormError.textContent='Vyberte sekciu (najprv ju vytvorte v Nastavení testu, ak ešte žiadna neexistuje).'; qalertFormError.style.display='block'; return; }
+    if(!title){ qalertFormError.textContent='Zadajte názov.'; qalertFormError.style.display='block'; return; }
+    if(!dateFromVal){ qalertFormError.textContent='Zadajte dátum vystavenia.'; qalertFormError.style.display='block'; return; }
+    if(!duration || duration<1){ qalertFormError.textContent='Platnosť musí byť aspoň 1 deň.'; qalertFormError.style.display='block'; return; }
+    qalertFormError.style.display='none';
+
+    var existing = editingQualityAlertId ? allQualityAlerts.find(function(q){ return q.id===editingQualityAlertId; }) : null;
+    var record = {
+      id: editingQualityAlertId || genId(),
+      areaId: areaId, title: title, description: desc,
+      imageData: qaPendingImageData,
+      dateFrom: new Date(dateFromVal + 'T00:00:00'),
+      durationDays: duration,
+      isActive: existing ? existing.isActive : true,
+      createdAt: existing ? existing.createdAt : new Date()
+    };
+    idbPut('qualityAlerts', record).then(function(){
+      if(editingQualityAlertId){
+        var idx = allQualityAlerts.findIndex(function(q){ return q.id===editingQualityAlertId; });
+        if(idx>=0) allQualityAlerts[idx]=record;
+      } else {
+        allQualityAlerts.push(record);
+      }
+      resetQaForm();
+      renderQaList();
+    });
+  });
+
+  function toggleQaActive(qa){
+    qa.isActive = !qa.isActive;
+    idbPut('qualityAlerts', qa).then(renderQaList);
+  }
+
+  function renderQaList(){
+    qalertsList.innerHTML='';
+    var sorted = allQualityAlerts.slice().sort(function(a,b){ return new Date(b.dateFrom) - new Date(a.dateFrom); });
+    qalertsEmpty.style.display = sorted.length===0 ? 'block' : 'none';
+    sorted.forEach(function(qa){
+      var card=document.createElement('div'); card.className='qa-card';
+      if(qa.imageData){
+        var thumb=document.createElement('img'); thumb.className='qa-card-thumb'; thumb.src=qa.imageData; thumb.alt=qa.title;
+        card.appendChild(thumb);
+      }
+      var head=document.createElement('div'); head.className='qa-card-head';
+      var strong=document.createElement('strong'); strong.textContent=qa.title;
+      var chip=document.createElement('button'); chip.type='button';
+      chip.className='badge badge-toggle ' + (qa.isActive?'active':'inactive');
+      chip.textContent = qa.isActive ? 'Aktívny' : 'Neaktívny';
+      chip.title = 'Kliknutím okamžite ' + (qa.isActive?'vypnete':'zapnete') + ' tento alert';
+      chip.addEventListener('click', function(){ toggleQaActive(qa); });
+      head.appendChild(strong); head.appendChild(chip);
+      card.appendChild(head);
+
+      var meta=document.createElement('div'); meta.className='qa-card-meta';
+      meta.textContent = currentAreaLabel(qa.areaId) + ' · platí ' + toDateInputValue(qa.dateFrom) + ' – ' + toDateInputValue(computeQaDateTo(qa));
+      card.appendChild(meta);
+
+      if(qa.description){
+        var desc=document.createElement('div'); desc.className='qa-card-desc'; desc.textContent=qa.description;
+        card.appendChild(desc);
+      }
+
+      var actions=document.createElement('div'); actions.className='qa-card-actions';
+      var editBtn=document.createElement('button'); editBtn.className='btn btn-ghost btn-sm'; editBtn.textContent='Upraviť';
+      editBtn.addEventListener('click', function(){ startEditQualityAlert(qa); });
+      var delBtn=document.createElement('button'); delBtn.className='btn btn-danger btn-sm'; delBtn.textContent='Zmazať';
+      delBtn.addEventListener('click', function(){
+        if(!confirm('Naozaj zmazať Quality Alert "' + qa.title + '"?')) return;
+        idbDeleteKey('qualityAlerts', qa.id).then(function(){
+          allQualityAlerts = allQualityAlerts.filter(function(x){ return x.id!==qa.id; });
+          if(editingQualityAlertId===qa.id) resetQaForm();
+          renderQaList();
+        });
+      });
+      actions.appendChild(editBtn); actions.appendChild(delBtn);
+      card.appendChild(actions);
+
+      qalertsList.appendChild(card);
+    });
+  }
+  resetQaForm();
+
+  /* =========================================================
      ADMIN: DEFINE CORRECT ANSWERS
   ========================================================= */
   var atabSetup = document.getElementById('atab-setup');
+  var atabOperators = document.getElementById('atab-operators');
+  var atabQalerts = document.getElementById('atab-qalerts');
   var atabReports = document.getElementById('atab-reports');
   var atabDashboard = document.getElementById('atab-dashboard');
   var adminPanels = {
     setup: document.getElementById('admin-setup'),
     define: document.getElementById('admin-define'),
+    operators: document.getElementById('admin-operators'),
+    qalerts: document.getElementById('admin-qalerts'),
     reports: document.getElementById('admin-reports'),
     dashboard: document.getElementById('admin-dashboard'),
     detail: document.getElementById('admin-attempt-detail')
@@ -1415,10 +1828,14 @@
   function showAdminPanel(name){
     Object.keys(adminPanels).forEach(function(k){ adminPanels[k].classList.toggle('is-active', k===name); });
     atabSetup.classList.toggle('is-active', name==='setup'||name==='define');
+    atabOperators.classList.toggle('is-active', name==='operators');
+    atabQalerts.classList.toggle('is-active', name==='qalerts');
     atabReports.classList.toggle('is-active', name==='reports'||name==='detail');
     atabDashboard.classList.toggle('is-active', name==='dashboard');
   }
   atabSetup.addEventListener('click', function(){ showAdminPanel('setup'); });
+  atabOperators.addEventListener('click', function(){ showAdminPanel('operators'); renderOperatorsList(); });
+  atabQalerts.addEventListener('click', function(){ showAdminPanel('qalerts'); refreshQaAreaSelect(); renderQaList(); });
   atabReports.addEventListener('click', function(){ showAdminPanel('reports'); renderReportsPanel(); });
   atabDashboard.addEventListener('click', function(){ showAdminPanel('dashboard'); renderDashboard(); });
   reportBatchSelect.addEventListener('change', renderReportsPanel);
@@ -1624,6 +2041,9 @@
       testStartSub.textContent = 'Dávka: ' + currentBatchLabel(activeBatchId) + ' · Fotiek na vyhodnotenie: ' + activePhotos.length;
       showTestScreen('start');
       refreshOperatorNameHistory();
+      fieldBadgeScan.value='';
+      badgeScanMsg.style.display='none';
+      fieldBadgeScan.focus();
     }
   }
 
@@ -1643,16 +2063,77 @@
   }
 
   /* =========================================================
+     TEST MODE: badge scan (RFID/NFC reader = keyboard + Enter)
+  ========================================================= */
+  var fieldBadgeScan = document.getElementById('field-badge-scan');
+  var badgeScanMsg = document.getElementById('badge-scan-msg');
+
+  fieldBadgeScan.addEventListener('keydown', function(e){
+    if(e.key!=='Enter') return;
+    e.preventDefault();
+    var badgeId = fieldBadgeScan.value.trim();
+    fieldBadgeScan.value='';
+    if(!badgeId) return;
+    var op = allOperators.find(function(o){ return o.badgeId===badgeId; });
+    if(op){
+      badgeScanMsg.style.display='none';
+      beginAttempt(op.name);
+    } else {
+      badgeScanMsg.textContent = 'Neznáma karta – over priradenie v Administrácii. Meno môžete zadať aj ručne nižšie.';
+      badgeScanMsg.style.display='block';
+      fieldBadgeScan.focus();
+    }
+  });
+
+  /* =========================================================
+     TEST MODE: quality alerts (interstitial before the eval screen)
+  ========================================================= */
+  var qaScreenImg=document.getElementById('qa-screen-img'), qaScreenTitle=document.getElementById('qa-screen-title'), qaScreenDesc=document.getElementById('qa-screen-desc');
+
+  function getPendingQualityAlerts(){
+    var batch = allBatches.find(function(b){ return b.id===activeBatchId; });
+    var areaId = batch ? batch.areaId : null;
+    if(!areaId) return [];
+    var today = new Date(); today.setHours(0,0,0,0);
+    return allQualityAlerts.filter(function(qa){
+      if(!qa.isActive || qa.areaId!==areaId) return false;
+      var from = new Date(qa.dateFrom); from.setHours(0,0,0,0);
+      var to = computeQaDateTo(qa); // already normalized to midnight
+      return today>=from && today<=to;
+    });
+  }
+
+  function showNextQualityAlert(){
+    if(pendingAlertsQueue.length===0){
+      showTestScreen('eval');
+      renderTestEval();
+      return;
+    }
+    var qa = pendingAlertsQueue.shift();
+    qaScreenTitle.textContent = qa.title;
+    qaScreenDesc.textContent = qa.description || '';
+    if(qa.imageData){ qaScreenImg.src = qa.imageData; qaScreenImg.style.display='block'; }
+    else { qaScreenImg.style.display='none'; }
+    showTestScreen('alert');
+  }
+  document.getElementById('btn-qa-continue').addEventListener('click', showNextQualityAlert);
+
+  /* =========================================================
      TEST MODE: taking the test
   ========================================================= */
   var fieldOpName=document.getElementById('field-op-name');
+
+  function beginAttempt(operatorName){
+    currentAttempt = { batchId:activeBatchId, batchLabel:currentBatchLabel(activeBatchId), operatorName:operatorName, startedAt:new Date(), answers:{}, index:0 };
+    pendingAlertsQueue = getPendingQualityAlerts();
+    showNextQualityAlert();
+  }
+
   document.getElementById('btn-begin-test').addEventListener('click', function(){
     var name=fieldOpName.value.trim();
     if(!name){ document.getElementById('op-name-error').style.display='block'; return; }
     document.getElementById('op-name-error').style.display='none';
-    currentAttempt = { batchId:activeBatchId, batchLabel:currentBatchLabel(activeBatchId), operatorName:name, startedAt:new Date(), answers:{}, index:0 };
-    showTestScreen('eval');
-    renderTestEval();
+    beginAttempt(name);
   });
 
   var tEvalPos=document.getElementById('t-eval-pos'), tEvalFilename=document.getElementById('t-eval-filename'), tEvalOperator=document.getElementById('t-eval-operator');

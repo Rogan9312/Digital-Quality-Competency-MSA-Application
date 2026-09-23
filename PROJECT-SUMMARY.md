@@ -57,6 +57,20 @@ logiky appky sa vďaka tomu nemusel meniť):
   takže neskoršie premenovanie dávky alebo zmena správnej odpovede nekazí
   historické reporty. `archived: true` = vylúčené zo všetkých
   súhrnov/dashboardu (pozri nižšie).
+- `operators` (doc id = `id`) — RFID/NFC karta → meno operátora:
+  `{id, badgeId, name, createdAt}`. `badgeId` je jedinečný reťazec z karty
+  (čítačka funguje ako klávesnica — "napíše" ho a odošle Enter). Spravuje
+  sa v Administrácii → záložka "Operátori".
+- `qualityAlerts` (doc id = `id`) — upozornenia viazané na Sekciu:
+  `{id, areaId, title, description, imageData, dateFrom, durationDays,
+  isActive, createdAt}`. `areaId` odkazuje na `areas`. `imageData` je
+  base64 `data:` URL (rovnaký princíp ako `photos.photoData`, žiadny
+  Firebase Storage). `dateFrom` + `durationDays` určujú dátumovú platnosť
+  (`dateTo` sa nikde needukladá, len sa dopočítava —
+  `computeQaDateTo()`). `isActive` je nezávislý manuálny prepínač NAD
+  RÁMEC dátumovej platnosti (obe podmienky musia platiť zároveň, aby sa
+  alert operátorovi zobrazil — pozri `getPendingQualityAlerts()`).
+  Spravuje sa v Administrácii → záložka "Quality Alerty".
 
 Poznámka k typom: Firestore vracia dátumové polia (`createdAt`,
 `startedAt`, `finishedAt`) ako `Timestamp` objekty, nie JS `Date`. Wrapper
@@ -71,7 +85,29 @@ nekonvertujú, keďže sa nikde spätne nečítajú.
 ### Test mode (bez hesla, pre operátorov)
 - Ak nie je nastavená aktívna dávka alebo nemá všetky fotky s definovanou
   správnou odpoveďou → empty state s vysvetlením.
-- Zadanie mena operátora (s `<datalist>` autocomplete z histórie mien).
+- **Štart testu — dve cesty, obe vedú do `beginAttempt(name)`:**
+  1. **Sken karty (RFID/NFC).** `#field-badge-scan` je vizuálne skrytý,
+     ale vždy zaostrený `<input>` na `#screen-test-start` (čítačka funguje
+     ako klávesnica — napíše `badgeId` a pošle Enter). Nájde sa zhoda v
+     `operators` → meno sa nastaví automaticky a test sa spustí rovno.
+     Nenájde sa → banner "Neznáma karta – over priradenie v
+     Administrácii", pole sa nezablokuje, dá sa pokračovať ručne.
+  2. **Ručné zadanie mena** (s `<datalist>` autocomplete z histórie mien)
+     + tlačidlo "Spustiť test" — nezávislá alternatíva vedľa skenu, nie
+     náhrada.
+  Zaostrenie `#field-badge-scan` sa nastavuje vždy pri zobrazení
+  `#screen-test-start` (`refreshTestModeEntry()`) — ak operátor klikne do
+  poľa mena, sken sa dočasne "pozastaví" (čítačka píše len do
+  zaostreného poľa), čo je zámerné a jednoduché riešenie.
+- **Quality Alert medzikrok.** Hneď po `beginAttempt()`, PRED
+  `#screen-test-eval`, appka skontroluje `getPendingQualityAlerts()` —
+  Quality Alerty, kde `areaId` sedí so sekciou aktívnej dávky, `isActive
+  ​===true` A dnešný dátum spadá do `<dateFrom, dateFrom+durationDays>`.
+  Pri zhode sa zobrazí `#screen-quality-alert` (fotka + názov + popis +
+  "Rozumiem, pokračovať"); viac alertov sa ukáže postupne za sebou
+  (`pendingAlertsQueue`, `showNextQualityAlert()` si volá samo seba, kým
+  front nie je prázdny, potom prejde na `#screen-test-eval`). Žiadny
+  alert nespĺňa podmienky → žiadny medzikrok, rovno na test.
 - Hodnotenie fotka po fotke: veľká fotka, 3 tlačidlá (OK/Hranične OK/NOK,
   klávesy 1/2/3), šípky/klávesy ←→, poznámka k fotke, filmový pás
   s farebným stavom, auto-presun na ďalšiu nezodpovedanú fotku.
@@ -80,7 +116,8 @@ nekonvertujú, keďže sa nikde spätne nečítajú.
   zámerná zmena — pôvodne bola skrytá kvôli opakovanému použitiu tej istej
   dávky viacerými operátormi, ale používateľ si vyžiadal plné odhalenie pre
   okamžitý tréning; pozri komentár v kóde pri `openLightbox`).
-- "Nový test (ďalší operátor)" — reset na zadanie mena, tá istá dávka.
+- "Nový test (ďalší operátor)" — reset na zadanie mena, tá istá dávka,
+  `#field-badge-scan` sa opäť zaostrí cez `refreshTestModeEntry()`.
 
 ### Prihlásenie — dve vrstvy
 1. **Firebase Authentication (gatuje celú appku).** Pred zobrazením
@@ -119,7 +156,7 @@ Firebase účtu, ktorý navyše pozná zdieľaný PIN — žiadne rozlíšenie r
 admin/operátor na úrovni Firebase účtov, PIN slúži ako spoločná druhá
 zábrana pred náhodným/neúmyselným vstupom do Administrácie.
 
-Tri podzáložky:
+Päť podzáložiek:
 1. **Nastavenie testu** — výber/vytvorenie Sekcie a Dávky, upload fotiek
    (sekvenčné načítanie cez `createImageBitmap`/Image + canvas resize na
    1400px + `toBlob` JPEG q=0.82 — **kriticky dôležité pre stabilitu**, pôvodná
@@ -127,13 +164,27 @@ Tri podzáložky:
    správnych odpovedí (rovnaké UI ako test, len ukladá `correctAnswer`),
    tlačidlo "Nastaviť ako aktuálnu pre operátorov", danger zone (vymazať
    len túto dávku).
-2. **Reporty** — tabuľka pokusov (filter dávka/dátum/archív, zoradenie
+2. **Operátori** — správa `operators` (meno + badgeId): tabuľka so
+   všetkými, formulár "+ Nový operátor" (meno + badgeId — badgeId sa dá
+   napísať ručne, alebo doň priložiť kartu, keďže čítačka píše do
+   zaostreného poľa ako klávesnica), Upraviť/Zmazať pri každom riadku.
+   Enter v poli mena/badgeId rovno uloží, ak je vyplnené aj to druhé.
+   Kontrola duplicitného `badgeId` pred uložením.
+3. **Quality Alerty** — správa `qualityAlerts`: formulár (Sekcia select,
+   názov, popis, nepovinná fotka cez rovnaký resize pipeline ako fotky
+   defektov — `resizeImageToBlob()`, zdieľané s dávkovým uploadom —,
+   dátum vystavenia s predvoleným dneškom, platnosť v dňoch s predvolenou
+   hodnotou 30), zoznam existujúcich alertov ako karty (`.qa-card`) s
+   klikateľným chipom stavu (zelený "Aktívny" / sivý "Neaktívny" —
+   klik okamžite prepne a uloží, bez potvrdzovacieho dialógu), zobrazeným
+   intervalom platnosti (dateFrom – dopočítaný dateTo), Upraviť/Zmazať.
+4. **Reporty** — tabuľka pokusov (filter dávka/dátum/archív, zoradenie
    default "najhoršie prvé"), CSV export, tlač, archivácia (pozri nižšie),
    detail jedného pokusu s klikateľnými riadkami → lightbox (plné odhalenie
    správnej odpovede, keďže je to admin pohľad), "Prehľad podľa dávok" keď je
    filter "Všetky dávky", "Štatistika podľa fotky" keď je vybraná konkrétna
    dávka.
-3. **Dashboard** — filtre Sekcia/Operátor/Od/Do. Layout (3+2+1 riadky, aby sa
+5. **Dashboard** — filtre Sekcia/Operátor/Od/Do. Layout (3+2+1 riadky, aby sa
    zmestilo na 16:9 bez scrollu stránky, jednotlivé grafy majú CSS
    `resize:vertical` — ťahaním za pravý dolný roh si užívateľ manuálne
    zmenší/zväčší ktorékoľvek okno):
