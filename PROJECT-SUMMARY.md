@@ -206,13 +206,16 @@ Tri podzáložky:
 - **Print CSS** (`@media print`) skrýva toolbar/topbar/dropzone, appka sa dá
   vytlačiť/exportovať ako PDF cez `window.print()` na reportoch aj detaile.
   Na výsledku operátora (`#screen-test-result`) aj v admin detaile pokusu
-  (`#admin-attempt-detail`) appka pri tlači nahradí kompaktný zoznam/tabuľku
-  fotiek (`#res-list`, `table.rtable`) väčšou 2-stĺpcovou mriežkou fotiek
-  s výsledkami (`.print-photo-grid`, id `res-print-grid`/`detail-print-grid`,
-  naplnené spoločnou funkciou `buildPrintPhotoCard()`) — na papieri sa
-  nedá kliknúť a otvoriť fotku v lightboxe, takže sa fotka aj obe hodnoty
-  (odpoveď/správna odpoveď) musia vytlačiť rovno viditeľné. Mriežka je
-  na obrazovke skrytá (`display:none`), zobrazí sa len cez `@media print`.
+  (`#admin-attempt-detail`) sa pri tlači **kompaktný zoznam/tabuľka so
+  všetkými výsledkami vytlačí ako doteraz** (nemení sa, zelené/červené
+  riadky zostávajú) a NAVYŠE sa za ním vytlačí mriežka väčších fotiek
+  (`.print-photo-grid`, id `res-print-grid`/`detail-print-grid`, naplnené
+  spoločnou funkciou `buildPrintPhotoCard()`) — ale **len pre nesprávne
+  vyhodnotené fotky** (`!a.isCorrect`), s nadpisom "Fotky nesprávne
+  vyhodnotených defektov (N):". Správne odpovede fotku v tlači nedostávajú
+  (stačí zelený riadok v zozname/tabuľke), keďže cieľom je hneď vidieť, čo
+  operátor pomýlil, nie zaplniť papier fotkami všetkého. Mriežka je na
+  obrazovke skrytá (`display:none`), zobrazí sa len cez `@media print`.
 
 ## Známe limity / veci, na ktoré upozorniť používateľa
 - Appka teraz **vyžaduje internetové pripojenie** (Firebase SDK + Firestore)

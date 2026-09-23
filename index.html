@@ -393,12 +393,17 @@
     .admin-panel,#screen-test-result{padding:0;overflow:visible;}
     table.rtable{font-size:11px;}
 
-    /* Na papieri sa nedá klikať na riadok a otvoriť fotku v lightboxe,
-       tak namiesto kompaktného zoznamu/tabuľky vytlačíme rovno mriežku
-       fotiek s výsledkami — 2 stĺpce, cca 4 fotky na stránku (A4). */
-    #res-list, #admin-attempt-detail table.rtable{display:none !important;}
+    /* Na papieri sa nedá klikať na riadok a otvoriť fotku v lightboxe.
+       Kompaktný zoznam/tabuľka so všetkými výsledkami (zelené/červené)
+       sa vytlačí ako doteraz, nemení sa. Navyše sa za ním vytlačí mriežka
+       fotiek — ale LEN pre nesprávne vyhodnotené (isCorrect===false),
+       aby bolo hneď vidieť, čo operátor pomýlil. 2 stĺpce, cca 4 fotky
+       na stránku (A4). */
     .print-photo-grid{
       display:grid; grid-template-columns:1fr 1fr; gap:8mm; margin-top:16px;
+    }
+    .print-photo-grid .ppg-heading{
+      grid-column:1 / -1; font-size:12px; font-weight:700; margin:4px 0 2px 0;
     }
     .print-photo-grid .ppg-card{
       border:1.5px solid var(--line-strong); border-radius:4px; padding:8px;
@@ -1790,6 +1795,12 @@
 
     resList.innerHTML='';
     resPrintGrid.innerHTML='';
+    var resMissCount = record.answers.filter(function(a){ return !a.isCorrect; }).length;
+    if(resMissCount>0){
+      var resPrintHeading=document.createElement('div'); resPrintHeading.className='ppg-heading';
+      resPrintHeading.textContent = 'Fotky nesprávne vyhodnotených defektov (' + resMissCount + '):';
+      resPrintGrid.appendChild(resPrintHeading);
+    }
     lightboxAnswers = record.answers;
     lightboxPhotos = activePhotos;
     record.answers.forEach(function(a, idx){
@@ -1805,7 +1816,7 @@
       var mark=document.createElement('span'); mark.className='mark '+(a.isCorrect?'hit':'miss'); mark.textContent=a.isCorrect?'✓':'✕';
       li.appendChild(img); li.appendChild(nameSpan); li.appendChild(mark);
       resList.appendChild(li);
-      resPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
+      if(!a.isCorrect) resPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
     });
   }
 
@@ -2013,6 +2024,12 @@
 
       detailTbody.innerHTML='';
       detailPrintGrid.innerHTML='';
+      var detMissCount = rec.answers.filter(function(a){ return !a.isCorrect; }).length;
+      if(detMissCount>0){
+        var detPrintHeading=document.createElement('div'); detPrintHeading.className='ppg-heading';
+        detPrintHeading.textContent = 'Fotky nesprávne vyhodnotených defektov (' + detMissCount + '):';
+        detailPrintGrid.appendChild(detPrintHeading);
+      }
       rec.answers.forEach(function(a, idx){
         var p = photos.find(function(ph){ return ph.id===a.photoId; });
         var tr=document.createElement('tr');
@@ -2031,7 +2048,7 @@
         td5.appendChild(mark); tr.appendChild(td5);
         var td6=document.createElement('td'); td6.textContent=a.note||'—'; tr.appendChild(td6);
         detailTbody.appendChild(tr);
-        detailPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
+        if(!a.isCorrect) detailPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
       });
 
       showAdminPanel('detail');
