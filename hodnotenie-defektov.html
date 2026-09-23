@@ -1157,6 +1157,7 @@
   var editingQualityAlertId = null;
   var qaPendingImageData = null; // base64 dataURL staged in the Quality Alert form, null = no photo
   var allQualityAlertAcks = []; // {id, qualityAlertId, operatorName, ackedAt} — who clicked "Rozumiem, pokračovať"
+  var qaOperatorRoster = []; // string[] — names for the Quality Alert "who saw it" grid: registered operators UNION anyone who has ever completed a test manually (badgeless), since "kto testuje" isn't limited to people with a card
   var pendingAlertsQueue = []; // quality alerts still to show before the current attempt's eval screen
   var currentQualityAlertShown = null; // the alert currently on #screen-quality-alert, so "Rozumiem" can record who saw it
 
@@ -1702,6 +1703,18 @@
     return to;
   }
 
+  /* Roster for the "kto videl" grid — registered operators (with a badge)
+     UNION anyone who has ever completed a test with a manually-typed name
+     (no badge). Testing isn't limited to people who have a card, so the
+     "who's missing" view shouldn't be either. */
+  function buildOperatorRoster(attempts){
+    var names = allOperators.map(function(o){ return o.name; });
+    attempts.forEach(function(a){
+      if(a.operatorName && names.indexOf(a.operatorName)===-1) names.push(a.operatorName);
+    });
+    return names.sort(function(a,b){ return a.localeCompare(b,'sk'); });
+  }
+
   function refreshQaAreaSelect(){
     if(!qaAreaSelect) return;
     var prevVal = qaAreaSelect.value;
@@ -1841,9 +1854,9 @@
       var acksEl=document.createElement('div'); acksEl.className='qa-card-acks';
       var acksLabel=document.createElement('div'); acksLabel.className='qa-card-acks-label'; acksLabel.textContent='Kto videl';
       acksEl.appendChild(acksLabel);
-      if(allOperators.length===0){
+      if(qaOperatorRoster.length===0){
         var noOps=document.createElement('div'); noOps.className='dash-card-sub'; noOps.style.margin='0';
-        noOps.textContent='Zatiaľ nie sú zaregistrovaní žiadni operátori (záložka Operátori).';
+        noOps.textContent='Zatiaľ nikto netestoval ani nie je zaregistrovaný žiadny operátor.';
         acksEl.appendChild(noOps);
       } else {
         var ackMap = {};
@@ -1851,11 +1864,11 @@
           if(!ackMap[a.operatorName] || new Date(a.ackedAt) > new Date(ackMap[a.operatorName])) ackMap[a.operatorName] = a.ackedAt;
         });
         var opsGrid=document.createElement('div'); opsGrid.className='qa-ops-grid';
-        allOperators.slice().sort(function(a,b){ return a.name.localeCompare(b.name,'sk'); }).forEach(function(op){
-          var seenAt = ackMap[op.name];
+        qaOperatorRoster.forEach(function(opName){
+          var seenAt = ackMap[opName];
           var opChip=document.createElement('span');
           opChip.className = 'qa-op-chip ' + (seenAt ? 'seen' : 'unseen');
-          opChip.textContent = seenAt ? (op.name + ' (' + new Date(seenAt).toLocaleDateString('sk-SK') + ')') : op.name;
+          opChip.textContent = seenAt ? (opName + ' (' + new Date(seenAt).toLocaleDateString('sk-SK') + ')') : opName;
           opsGrid.appendChild(opChip);
         });
         acksEl.appendChild(opsGrid);
@@ -1939,10 +1952,11 @@
     /* Refetch fresh, like Reporty does for "attempts" — acks come from
        operators on other devices/sessions, so the cached array from init()
        could be stale by the time the admin opens this tab. */
-    Promise.all([idbGetAll('qualityAlerts'), idbGetAll('qualityAlertAcks'), idbGetAll('operators')]).then(function(res){
+    Promise.all([idbGetAll('qualityAlerts'), idbGetAll('qualityAlertAcks'), idbGetAll('operators'), idbGetAll('attempts')]).then(function(res){
       allQualityAlerts = res[0] || [];
       allQualityAlertAcks = res[1] || [];
       allOperators = res[2] || [];
+      qaOperatorRoster = buildOperatorRoster(res[3] || []);
       renderQaList();
     });
   });
@@ -2780,10 +2794,11 @@
     /* Independent of the attempts-based charts below — refetch fresh, since
        alerts/acks/operators change from other sessions (like Reporty does
        for "attempts"), then draw the Quality Alert overview matrix. */
-    Promise.all([idbGetAll('operators'), idbGetAll('qualityAlerts'), idbGetAll('qualityAlertAcks')]).then(function(res){
+    Promise.all([idbGetAll('operators'), idbGetAll('qualityAlerts'), idbGetAll('qualityAlertAcks'), idbGetAll('attempts')]).then(function(res){
       allOperators = res[0] || [];
       allQualityAlerts = res[1] || [];
       allQualityAlertAcks = res[2] || [];
+      qaOperatorRoster = buildOperatorRoster(res[3] || []);
       renderQaDashboardMatrix();
     });
 
@@ -2963,7 +2978,7 @@
     var summary = document.getElementById('dash-qa-summary');
 
     var issued = getCurrentlyIssuedQualityAlerts().sort(function(a,b){ return new Date(a.dateFrom) - new Date(b.dateFrom); });
-    var ops = allOperators.slice().sort(function(a,b){ return a.name.localeCompare(b.name,'sk'); });
+    var ops = qaOperatorRoster;
 
     summary.textContent = 'Aktuálne vydané: ' + issued.length + (ops.length ? (' · Operátorov na kontrolu: ' + ops.length) : '');
 
@@ -2971,7 +2986,7 @@
       wrap.innerHTML = '';
       empty.textContent = issued.length===0
         ? 'Zatiaľ žiadne aktuálne vydané Quality Alerty.'
-        : 'Zatiaľ nie sú zaregistrovaní žiadni operátori (záložka Operátori).';
+        : 'Zatiaľ nikto netestoval ani nie je zaregistrovaný žiadny operátor.';
       empty.style.display = 'block';
       return;
     }
@@ -2979,7 +2994,7 @@
 
     var today = new Date(); today.setHours(0,0,0,0);
     var html = '<table class="rtable qa-matrix-table"><thead><tr><th>Alert</th><th>Dní</th>';
-    ops.forEach(function(op){ html += '<th>' + escapeHtml(op.name) + '</th>'; });
+    ops.forEach(function(opName){ html += '<th>' + escapeHtml(opName) + '</th>'; });
     html += '</tr></thead><tbody>';
 
     issued.forEach(function(qa){
@@ -2994,12 +3009,12 @@
       if(qa.imageData) html += '<img class="qa-matrix-thumb" src="' + qa.imageData + '" alt="">';
       html += '<span>' + escapeHtml(qa.title) + '</span></div></td>';
       html += '<td>' + daysActive + '</td>';
-      ops.forEach(function(op){
-        var seenAt = ackMap[op.name];
+      ops.forEach(function(opName){
+        var seenAt = ackMap[opName];
         if(seenAt){
-          html += '<td class="qa-matrix-cell seen" title="' + escapeHtml(op.name) + ' — videl ' + new Date(seenAt).toLocaleDateString('sk-SK') + '">&#10003;</td>';
+          html += '<td class="qa-matrix-cell seen" title="' + escapeHtml(opName) + ' — videl ' + new Date(seenAt).toLocaleDateString('sk-SK') + '">&#10003;</td>';
         } else {
-          html += '<td class="qa-matrix-cell unseen" title="' + escapeHtml(op.name) + ' — ešte nevidel">&#10007;</td>';
+          html += '<td class="qa-matrix-cell unseen" title="' + escapeHtml(opName) + ' — ešte nevidel">&#10007;</td>';
         }
       });
       html += '</tr>';

@@ -92,9 +92,15 @@ logiky appky sa vďaka tomu nemusel meniť):
   podľa šírky okna, kompaktnejší prehľad. Párovanie je podľa
   `operatorName` reťazca (nie cudzieho kľúča) — sedí to s tým, že
   `attempts.operatorName` aj `qualityAlertAcks.operatorName` sú tiež
-  len reťazce, a "kto ešte nevidel" má zmysel len voči pevnému zoznamu
-  registrovaných operátorov (`operators`), nie voči ľubovoľne ručne
-  napísaným menám.
+  len reťazce.
+
+  **Roster pre "kto videl" (`qaOperatorRoster`, `buildOperatorRoster()`)**
+  — zámerne NIE je len `allOperators` (registrovaní s kartou). Testovať
+  môže aj niekto bez karty (ručne zadané meno na štarte testu, napr.
+  "TST03"), takže roster je zjednotenie: mená z `operators` **union**
+  distinct `attempts.operatorName` naprieč všetkými pokusmi. Počíta sa
+  nanovo (fetch `operators` aj `attempts`) vždy pri otvorení záložky
+  "Quality Alerty" aj záložky "Dashboard" — nie je to cache z `init()`.
 
 Poznámka k typom: Firestore vracia dátumové polia (`createdAt`,
 `startedAt`, `finishedAt`) ako `Timestamp` objekty, nie JS `Date`. Wrapper
