@@ -214,11 +214,18 @@
 
   .result-actions{display:flex;gap:10px;margin-top:22px;justify-content:center;flex-wrap:wrap;}
 
-  #screen-auth-gate .card{max-width:400px;margin:0 auto;}
+  #screen-auth-gate .card, #screen-admin-pin-gate .card{max-width:400px;margin:0 auto;}
   .lock-icon{
     width:36px;height:36px;border:1.5px solid var(--ink-faint);border-radius:50%;
     display:flex;align-items:center;justify-content:center;margin-bottom:16px;color:var(--ink-faint);font-size:16px;
   }
+  .pin-input-row{display:flex;gap:10px;justify-content:center;margin-top:6px;}
+  .pin-digit{
+    width:52px;height:60px;text-align:center;font-size:24px;font-weight:600;
+    border:1px solid var(--line);border-radius:var(--radius-s);
+    font-family:var(--font-mono);color:var(--ink);background:#fff;
+  }
+  .pin-digit:focus{outline:2px solid var(--navy-soft);outline-offset:1px;}
 
   #admin-shell{min-height:0;}
   .admin-subnav{
@@ -501,12 +508,58 @@
     <!-- ========== ADMIN MODE ========== -->
     <section id="mode-admin" class="mode">
 
+      <section id="screen-admin-pin-gate" class="screen centerwrap">
+        <div class="card panel-narrow">
+          <div class="lock-icon">&#128274;</div>
+          <div id="pin-setup">
+            <h2 class="scr-title">Nastavenie PIN kódu</h2>
+            <p class="scr-sub" style="margin-bottom:18px;">Nastavte 4-miestny PIN pre vstup do administrácie.</p>
+            <div class="field">
+              <label>Nový PIN</label>
+              <div class="pin-input-row" id="pin-setup-row-1">
+                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 1">
+                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 2">
+                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 3">
+                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 4">
+              </div>
+            </div>
+            <div class="field">
+              <label>Potvrďte PIN</label>
+              <div class="pin-input-row" id="pin-setup-row-2">
+                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 1">
+                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 2">
+                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 3">
+                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 4">
+              </div>
+              <div class="field-error" id="pin-setup-error" style="display:none;"></div>
+            </div>
+            <button class="btn btn-primary btn-block" id="btn-set-pin">Nastaviť PIN a pokračovať</button>
+          </div>
+          <div id="pin-login" style="display:none;">
+            <h2 class="scr-title">Zadajte PIN</h2>
+            <p class="scr-sub" style="margin-bottom:18px;">Táto sekcia je chránená PIN kódom.</p>
+            <div class="pin-input-row" id="pin-login-row">
+              <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 1">
+              <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 2">
+              <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 3">
+              <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 4">
+            </div>
+            <div class="field-error" id="pin-login-error" style="display:none;">Nesprávny PIN.</div>
+            <button class="btn btn-primary btn-block" id="btn-pin-login" style="margin-top:14px;">Vstúpiť</button>
+          </div>
+        </div>
+      </section>
+
       <section id="admin-shell" class="screen">
         <div class="admin-subnav">
           <div class="tabs">
             <button id="atab-setup" class="is-active">Nastavenie testu</button>
             <button id="atab-reports">Reporty</button>
             <button id="atab-dashboard">Dashboard</button>
+          </div>
+          <div style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" id="btn-change-pin">Zmeniť PIN</button>
+            <button class="btn btn-ghost btn-sm" id="btn-lock-admin">Zamknúť administráciu</button>
           </div>
         </div>
 
@@ -879,6 +932,37 @@
   }
 
   /* =========================================================
+     PIN HASHING (deterrent-level, second gate inside Administrácia,
+     on top of the Firebase Auth login that already protects the app)
+  ========================================================= */
+  function randomSalt(){
+    if(window.crypto && crypto.getRandomValues){
+      var arr = new Uint8Array(16); crypto.getRandomValues(arr);
+      return Array.prototype.map.call(arr, function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+    }
+    return Math.random().toString(16).slice(2) + Date.now().toString(16);
+  }
+  function fallbackHash(str){
+    var h1=0x811c9dc5, h2=0x811c9dc5;
+    for(var i=0;i<str.length;i++){
+      var c=str.charCodeAt(i);
+      h1=(h1^c)>>>0; h1=Math.imul(h1,16777619)>>>0;
+      h2=(h2^(c<<3))>>>0; h2=Math.imul(h2,2246822519)>>>0;
+    }
+    return h1.toString(16)+h2.toString(16);
+  }
+  function hashPin(pin, salt){
+    var input = salt + '::' + pin;
+    if(window.crypto && window.crypto.subtle){
+      var enc = new TextEncoder().encode(input);
+      return crypto.subtle.digest('SHA-256', enc).then(function(digest){
+        return Array.prototype.map.call(new Uint8Array(digest), function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+      }).catch(function(){ return fallbackHash(input); });
+    }
+    return Promise.resolve(fallbackHash(input));
+  }
+
+  /* =========================================================
      STATE
   ========================================================= */
   var allBatches = [];        // {id, label, createdAt, areaId}
@@ -888,6 +972,9 @@
   var photosCache = {};       // batchId -> [{id,name,photoData,url,correctAnswer,order,batchId}]
   var editingPhotos = [];
   var activePhotos = [];
+
+  var adminPinHash = null;    // {key:'adminPin', hash, salt} loaded from Firestore, or null if not set yet
+  var adminPinVerified = false;
 
   var currentAttempt = null;
   var defineIndex = 0;
@@ -931,7 +1018,7 @@
     navTest.classList.toggle('is-active', name==='test');
     navAdmin.classList.toggle('is-active', name==='admin');
     if(name==='admin') renderAdminGateOrShell();
-    if(name==='test') refreshTestModeEntry();
+    if(name==='test'){ adminPinVerified=false; refreshTestModeEntry(); }
   }
 
   /* =========================================================
@@ -960,7 +1047,10 @@
   }
 
   function init(){
-    ensureBatchesExist().then(function(){
+    idbGet('kv','adminPin').then(function(rec){
+      adminPinHash = rec || null;
+      return ensureBatchesExist();
+    }).then(function(){
       return idbGetAll('areas');
     }).then(function(areas){
       allAreas = areas || [];
@@ -1374,14 +1464,114 @@
   });
 
   /* =========================================================
-     ADMIN SHELL (access already gated by Firebase Auth login)
+     ADMIN PIN GATE (second gate inside Administrácia, on top of the
+     Firebase Auth login that already protects the whole app)
   ========================================================= */
   var adminShell=document.getElementById('admin-shell');
+  var screenPinGate=document.getElementById('screen-admin-pin-gate');
+  var pinSetupEl=document.getElementById('pin-setup'), pinLoginEl=document.getElementById('pin-login');
+
+  function setupPinBoxes(container, onComplete){
+    var inputs = Array.prototype.slice.call(container.querySelectorAll('input.pin-digit'));
+    function checkComplete(){
+      if(onComplete && inputs.every(function(i){ return i.value.length===1; })) onComplete();
+    }
+    inputs.forEach(function(inp, idx){
+      inp.addEventListener('input', function(){
+        inp.value = inp.value.replace(/[^0-9]/g,'').slice(0,1);
+        if(inp.value && idx<inputs.length-1) inputs[idx+1].focus();
+        checkComplete();
+      });
+      inp.addEventListener('keydown', function(e){
+        if(e.key==='Backspace' && !inp.value && idx>0) inputs[idx-1].focus();
+      });
+    });
+    return {
+      getValue: function(){ return inputs.map(function(i){ return i.value; }).join(''); },
+      clear: function(){ inputs.forEach(function(i){ i.value=''; }); inputs[0].focus(); },
+      focusFirst: function(){ inputs[0].focus(); }
+    };
+  }
+
+  var pinSetupBoxes1 = setupPinBoxes(document.getElementById('pin-setup-row-1'), function(){
+    document.getElementById('pin-setup-row-2').querySelector('input.pin-digit').focus();
+  });
+  var pinSetupBoxes2 = setupPinBoxes(document.getElementById('pin-setup-row-2'));
+  var pinLoginBoxes = setupPinBoxes(document.getElementById('pin-login-row'), attemptPinLogin);
 
   function renderAdminGateOrShell(){
-    adminShell.classList.add('is-active');
-    showAdminPanel('setup');
+    if(adminPinVerified){
+      screenPinGate.classList.remove('is-active');
+      adminShell.classList.add('is-active');
+      showAdminPanel('setup');
+    } else {
+      adminShell.classList.remove('is-active');
+      screenPinGate.classList.add('is-active');
+      if(adminPinHash){
+        pinSetupEl.style.display='none'; pinLoginEl.style.display='block';
+        pinLoginBoxes.clear();
+        document.getElementById('pin-login-error').style.display='none';
+      } else {
+        pinSetupEl.style.display='block'; pinLoginEl.style.display='none';
+        pinSetupBoxes1.clear(); pinSetupBoxes2.clear();
+        document.getElementById('pin-setup-error').style.display='none';
+      }
+    }
   }
+
+  document.getElementById('btn-set-pin').addEventListener('click', function(){
+    var p1=pinSetupBoxes1.getValue(), p2=pinSetupBoxes2.getValue();
+    var errEl=document.getElementById('pin-setup-error');
+    if(p1.length<4){ errEl.textContent='Zadajte celý 4-miestny PIN.'; errEl.style.display='block'; return; }
+    if(p1!==p2){ errEl.textContent='PIN kódy sa nezhodujú.'; errEl.style.display='block'; pinSetupBoxes2.clear(); return; }
+    var salt=randomSalt();
+    hashPin(p1,salt).then(function(hash){
+      var rec={key:'adminPin', hash:hash, salt:salt};
+      return idbPut('kv',rec).then(function(){ adminPinHash=rec; adminPinVerified=true; renderAdminGateOrShell(); });
+    }).catch(function(err){
+      errEl.textContent = 'Nepodarilo sa uložiť PIN (' + (err && err.message ? err.message : err) + ').';
+      errEl.style.display='block';
+    });
+  });
+
+  function attemptPinLogin(){
+    var pin=pinLoginBoxes.getValue();
+    if(pin.length<4) return;
+    hashPin(pin, adminPinHash.salt).then(function(hash){
+      if(hash===adminPinHash.hash){ adminPinVerified=true; renderAdminGateOrShell(); }
+      else {
+        var errEl = document.getElementById('pin-login-error');
+        errEl.textContent = 'Nesprávny PIN.';
+        errEl.style.display='block';
+        pinLoginBoxes.clear();
+      }
+    }).catch(function(err){
+      var errEl = document.getElementById('pin-login-error');
+      errEl.textContent = 'Nepodarilo sa overiť PIN (' + (err && err.message ? err.message : err) + ').';
+      errEl.style.display='block';
+    });
+  }
+  document.getElementById('btn-pin-login').addEventListener('click', attemptPinLogin);
+
+  document.getElementById('btn-lock-admin').addEventListener('click', function(){ adminPinVerified=false; renderAdminGateOrShell(); });
+
+  document.getElementById('btn-change-pin').addEventListener('click', function(){
+    var current = prompt('Zadajte súčasný PIN:');
+    if(current===null) return;
+    hashPin(current, adminPinHash.salt).then(function(hash){
+      if(hash!==adminPinHash.hash){ alert('Nesprávny súčasný PIN.'); return; }
+      var np1 = prompt('Nový PIN (presne 4 číslice):');
+      if(np1===null) return;
+      if(!/^\d{4}$/.test(np1)){ alert('PIN musí mať presne 4 číslice.'); return; }
+      var np2 = prompt('Potvrďte nový PIN:');
+      if(np2!==np1){ alert('PIN kódy sa nezhodujú.'); return; }
+      var salt=randomSalt();
+      hashPin(np1,salt).then(function(hash2){
+        var rec={key:'adminPin', hash:hash2, salt:salt};
+        idbPut('kv',rec).then(function(){ adminPinHash=rec; alert('PIN bol zmenený.'); });
+      });
+    });
+  });
 
   /* =========================================================
      TEST MODE: entry state

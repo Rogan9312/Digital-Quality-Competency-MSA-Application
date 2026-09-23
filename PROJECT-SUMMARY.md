@@ -32,9 +32,11 @@ Firestore kolekcie zámerne kopírujú pôvodné IndexedDB object stores 1:1
 (cez `idbPut/idbGet/idbGetAll/idbDeleteKey/idbClear` wrapper funkcie v kóde,
 ktoré teraz interne volajú Firestore namiesto IndexedDB — zvyšok biznis
 logiky appky sa vďaka tomu nemusel meniť):
-- `kv` (doc id = `key`) — voľné key-value: `activeBatchId` (`{key, value}`).
-  (`adminAuth` záznam z pôvodnej appky odpadol — heslo admina nahradilo
-  Firebase Authentication.)
+- `kv` (doc id = `key`) — voľné key-value: `activeBatchId` (`{key, value}`),
+  `adminPin` (`{key, hash, salt}` — hash 4-miestneho PIN kódu pre vstup do
+  Administrácie, pozri nižšie). Pôvodný `adminAuth` záznam (text heslo)
+  z pred-Firebase verzie odpadol — nahradilo ho Firebase Authentication
+  pre celú appku plus samostatný `adminPin` len pre Administráciu.
 - `areas` (doc id = `id`) — **Sekcie/projekty**: `{id, label, createdAt}`.
   Nadradená kategória nad dávkami (napr. "Dvere W177").
 - `batches` (doc id = `id`) — **Dávky**: `{id, label, createdAt, areaId}`.
@@ -80,20 +82,42 @@ nekonvertujú, keďže sa nikde spätne nečítajú.
   okamžitý tréning; pozri komentár v kóde pri `openLightbox`).
 - "Nový test (ďalší operátor)" — reset na zadanie mena, tá istá dávka.
 
-### Prihlásenie (Firebase Authentication, gatuje celú appku)
-Pred zobrazením čohokoľvek (Test aj Administrácia) appka vyžaduje
-prihlásenie e-mailom a heslom cez Firebase Auth (`#screen-auth-gate`,
-`auth.onAuthStateChanged` v kóde). Účty (typicky 4, pre QM manažéra a
-operátorov) sa spravujú **len vo Firebase Console** (Authentication →
-Users) — appka samotná nemá žiadny "registračný" formulár ani obrazovku
-na zmenu hesla, to sa robí tiež cez konzolu alebo Firebase "reset password"
-e-mail. Toto nahradilo pôvodný interný admin-only password gate (SHA-256
-hash v IndexedDB) — ten bol odstránený, keďže by bol duplicitný voči
-skutočnému Firebase login-u.
+### Prihlásenie — dve vrstvy
+1. **Firebase Authentication (gatuje celú appku).** Pred zobrazením
+   čohokoľvek (Test aj Administrácia) appka vyžaduje prihlásenie e-mailom
+   a heslom cez Firebase Auth (`#screen-auth-gate`, `auth.onAuthStateChanged`
+   v kóde). Účty (typicky 4, pre QM manažéra a operátorov) sa spravujú
+   **len vo Firebase Console** (Authentication → Users) — appka samotná
+   nemá žiadny "registračný" formulár ani obrazovku na zmenu hesla, to sa
+   robí tiež cez konzolu alebo Firebase "reset password" e-mail.
+2. **4-miestny PIN (druhá vrstva, len pre vstup do Administrácie).**
+   Nad rámec Firebase loginu appka pri vstupe do záložky `nav-admin`
+   vyžaduje ešte 4-miestny numerický PIN (`#screen-admin-pin-gate`) —
+   spoločný pre všetkých, nie per-účet. Prvý vstup ponúkne "nastaviť PIN
+   + potvrdiť", ďalšie vstupy už len "zadať PIN". PIN sa hashuje
+   (SHA-256 cez `crypto.subtle`, so soľou, `fallbackHash` ako záloha keď
+   `crypto.subtle` nie je k dispozícii — funkcie `randomSalt`/`hashPin`)
+   a hash sa ukladá do Firestore `kv` dokumentu s id `adminPin`
+   (`{key:'adminPin', hash, salt}` — v tej istej kolekcii `kv`, kde je aj
+   `activeBatchId`, ale pod iným kľúčom než malo pôvodné `adminAuth` pred
+   Firebase migráciou, aby nedošlo k zámene s Firebase Auth). UI: 4
+   samostatné číslicové polia (`input type="tel" inputmode="numeric"`)
+   s automatickým presunom na ďalšie pole (`setupPinBoxes()` helper) —
+   žiadna vlastná numerická klávesnica na obrazovke, spolieha sa na
+   natívnu numerickú klávesnicu mobilu/tabletu z `inputmode="numeric"`.
+   Zámerne **spoločný PIN pre všetkých**, nie per-osoba — jednoduchšie
+   a spoľahlivejšie riešenie, žiadna správa viacerých PIN kódov.
+   **Automatické odomknutie PIN gate pri odchode zo záložky:** prepnutie
+   na `nav-test` nastaví `adminPinVerified=false` (v `switchMode()`), takže
+   pri návrate do Administrácie appka PIN vyžiada znova. Tlačidlo
+   "Zamknúť administráciu" robí to isté ručne bez prepnutia záložky.
+   "Zmeniť PIN" (cez `prompt()` dialógy, zámerne jednoduché, nie vlastná
+   obrazovka) overí súčasný PIN a uloží nový.
 
-Administrácia (druhá záložka `nav-admin`) je teraz dostupná ktorémukoľvek
-prihlásenému účtu bez ďalšieho hesla — všetci 4 používatelia majú rovnaké
-oprávnenia (žiadne rozlíšenie rolí admin/operátor na úrovni appky).
+Administrácia (druhá záložka `nav-admin`) je teda dostupná ktorémukoľvek
+Firebase účtu, ktorý navyše pozná zdieľaný PIN — žiadne rozlíšenie rolí
+admin/operátor na úrovni Firebase účtov, PIN slúži ako spoločná druhá
+zábrana pred náhodným/neúmyselným vstupom do Administrácie.
 
 Tri podzáložky:
 1. **Nastavenie testu** — výber/vytvorenie Sekcie a Dávky, upload fotiek
