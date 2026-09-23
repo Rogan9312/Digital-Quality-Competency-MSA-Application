@@ -292,6 +292,7 @@
   .qa-card-head strong{font-size:14px;}
   .qa-card-meta{font-size:12px;color:var(--ink-soft);margin-bottom:6px;}
   .qa-card-desc{font-size:13px;color:var(--ink);margin-bottom:10px;white-space:pre-wrap;}
+  .qa-card-acks{font-size:11.5px;color:var(--ink-soft);margin-bottom:10px;padding-top:8px;border-top:1px dashed var(--line);}
   .qa-card-actions{display:flex;gap:8px;}
   .qa-card-thumb{width:100%;max-height:120px;object-fit:cover;border-radius:4px;margin-bottom:8px;display:block;}
 
@@ -1033,7 +1034,7 @@
     showStorageWarning('Nastala chyba pri práci s dátami (' + msg + '). Skúste obnoviť stránku. Ak to pretrváva, skontrolujte pripojenie na internet alebo Firestore/Storage pravidlá v konzole projektu.');
   });
 
-  var KEYPATHS = { kv:'key', photos:'id', attempts:'id', batches:'id', areas:'id', operators:'id', qualityAlerts:'id' };
+  var KEYPATHS = { kv:'key', photos:'id', attempts:'id', batches:'id', areas:'id', operators:'id', qualityAlerts:'id', qualityAlertAcks:'id' };
 
   function fsConvert(data){
     if(!data) return data;
@@ -1122,7 +1123,9 @@
   var allQualityAlerts = [];  // {id, areaId, title, description, imageData, dateFrom, durationDays, isActive, createdAt}
   var editingQualityAlertId = null;
   var qaPendingImageData = null; // base64 dataURL staged in the Quality Alert form, null = no photo
+  var allQualityAlertAcks = []; // {id, qualityAlertId, operatorName, ackedAt} — who clicked "Rozumiem, pokračovať"
   var pendingAlertsQueue = []; // quality alerts still to show before the current attempt's eval screen
+  var currentQualityAlertShown = null; // the alert currently on #screen-quality-alert, so "Rozumiem" can record who saw it
 
   var currentAttempt = null;
   var defineIndex = 0;
@@ -1162,6 +1165,16 @@
   navAdmin.addEventListener('click', function(){ switchMode('admin'); });
 
   function switchMode(name){
+    if(name==='admin' && currentAttempt){
+      /* Leaving Test mid-attempt abandons it — a test must be completed in
+         one sitting to count. Nothing was ever saved for it (finishAttempt()
+         is the only place that writes to "attempts"), so there's nothing to
+         undo — just drop the in-memory state so the operator can't resume it
+         by switching back to Test later. */
+      currentAttempt = null;
+      pendingAlertsQueue = [];
+      currentQualityAlertShown = null;
+    }
     modes.test.classList.toggle('is-active', name==='test');
     modes.admin.classList.toggle('is-active', name==='admin');
     navTest.classList.toggle('is-active', name==='test');
@@ -1208,12 +1221,13 @@
       activeBatchId = rec ? rec.value : (allBatches[0] ? allBatches[0].id : null);
       if(activeBatchId && !allBatches.some(function(b){ return b.id===activeBatchId; })) activeBatchId = allBatches[0] ? allBatches[0].id : null;
       editingBatchId = activeBatchId || (allBatches[0] ? allBatches[0].id : null);
-      return Promise.all([getPhotosForBatch(editingBatchId), getPhotosForBatch(activeBatchId), idbGetAll('operators'), idbGetAll('qualityAlerts')]);
+      return Promise.all([getPhotosForBatch(editingBatchId), getPhotosForBatch(activeBatchId), idbGetAll('operators'), idbGetAll('qualityAlerts'), idbGetAll('qualityAlertAcks')]);
     }).then(function(res){
       editingPhotos = res[0];
       activePhotos = (activeBatchId===editingBatchId) ? editingPhotos : res[1];
       allOperators = res[2] || [];
       allQualityAlerts = res[3] || [];
+      allQualityAlertAcks = res[4] || [];
       refreshBatchSelectors();
       renderSetupState();
       refreshTestModeEntry();
@@ -1788,17 +1802,29 @@
         card.appendChild(desc);
       }
 
+      var acks = allQualityAlertAcks.filter(function(a){ return a.qualityAlertId===qa.id; })
+        .sort(function(a,b){ return new Date(b.ackedAt) - new Date(a.ackedAt); });
+      var acksEl=document.createElement('div'); acksEl.className='qa-card-acks';
+      acksEl.textContent = acks.length
+        ? ('Videli (' + acks.length + '): ' + acks.map(function(a){ return a.operatorName + ' (' + new Date(a.ackedAt).toLocaleDateString('sk-SK') + ')'; }).join(', '))
+        : 'Zatiaľ nikto z operátorov nepotvrdil.';
+      card.appendChild(acksEl);
+
       var actions=document.createElement('div'); actions.className='qa-card-actions';
       var editBtn=document.createElement('button'); editBtn.className='btn btn-ghost btn-sm'; editBtn.textContent='Upraviť';
       editBtn.addEventListener('click', function(){ startEditQualityAlert(qa); });
       var delBtn=document.createElement('button'); delBtn.className='btn btn-danger btn-sm'; delBtn.textContent='Zmazať';
       delBtn.addEventListener('click', function(){
-        if(!confirm('Naozaj zmazať Quality Alert "' + qa.title + '"?')) return;
-        idbDeleteKey('qualityAlerts', qa.id).then(function(){
-          allQualityAlerts = allQualityAlerts.filter(function(x){ return x.id!==qa.id; });
-          if(editingQualityAlertId===qa.id) resetQaForm();
-          renderQaList();
-        });
+        if(!confirm('Naozaj zmazať Quality Alert "' + qa.title + '"? Zmažú sa aj záznamy o tom, ktorí operátori ho videli.')) return;
+        var relatedAcks = allQualityAlertAcks.filter(function(a){ return a.qualityAlertId===qa.id; });
+        Promise.all(relatedAcks.map(function(a){ return idbDeleteKey('qualityAlertAcks', a.id); }))
+          .then(function(){ return idbDeleteKey('qualityAlerts', qa.id); })
+          .then(function(){
+            allQualityAlerts = allQualityAlerts.filter(function(x){ return x.id!==qa.id; });
+            allQualityAlertAcks = allQualityAlertAcks.filter(function(a){ return a.qualityAlertId!==qa.id; });
+            if(editingQualityAlertId===qa.id) resetQaForm();
+            renderQaList();
+          });
       });
       actions.appendChild(editBtn); actions.appendChild(delBtn);
       card.appendChild(actions);
@@ -1835,7 +1861,18 @@
   }
   atabSetup.addEventListener('click', function(){ showAdminPanel('setup'); });
   atabOperators.addEventListener('click', function(){ showAdminPanel('operators'); renderOperatorsList(); });
-  atabQalerts.addEventListener('click', function(){ showAdminPanel('qalerts'); refreshQaAreaSelect(); renderQaList(); });
+  atabQalerts.addEventListener('click', function(){
+    showAdminPanel('qalerts');
+    refreshQaAreaSelect();
+    /* Refetch fresh, like Reporty does for "attempts" — acks come from
+       operators on other devices/sessions, so the cached array from init()
+       could be stale by the time the admin opens this tab. */
+    Promise.all([idbGetAll('qualityAlerts'), idbGetAll('qualityAlertAcks')]).then(function(res){
+      allQualityAlerts = res[0] || [];
+      allQualityAlertAcks = res[1] || [];
+      renderQaList();
+    });
+  });
   atabReports.addEventListener('click', function(){ showAdminPanel('reports'); renderReportsPanel(); });
   atabDashboard.addEventListener('click', function(){ showAdminPanel('dashboard'); renderDashboard(); });
   reportBatchSelect.addEventListener('change', renderReportsPanel);
@@ -2105,18 +2142,28 @@
 
   function showNextQualityAlert(){
     if(pendingAlertsQueue.length===0){
+      currentQualityAlertShown = null;
       showTestScreen('eval');
       renderTestEval();
       return;
     }
     var qa = pendingAlertsQueue.shift();
+    currentQualityAlertShown = qa;
     qaScreenTitle.textContent = qa.title;
     qaScreenDesc.textContent = qa.description || '';
     if(qa.imageData){ qaScreenImg.src = qa.imageData; qaScreenImg.style.display='block'; }
     else { qaScreenImg.style.display='none'; }
     showTestScreen('alert');
   }
-  document.getElementById('btn-qa-continue').addEventListener('click', showNextQualityAlert);
+  document.getElementById('btn-qa-continue').addEventListener('click', function(){
+    /* Record who saw & acknowledged this alert (for the admin's "kto videl"
+       overview) before moving on — fire-and-forget, doesn't block the operator. */
+    if(currentQualityAlertShown && currentAttempt){
+      var ack = { id:genId(), qualityAlertId:currentQualityAlertShown.id, operatorName:currentAttempt.operatorName, ackedAt:new Date() };
+      idbPut('qualityAlertAcks', ack).then(function(){ allQualityAlertAcks.push(ack); });
+    }
+    showNextQualityAlert();
+  });
 
   /* =========================================================
      TEST MODE: taking the test

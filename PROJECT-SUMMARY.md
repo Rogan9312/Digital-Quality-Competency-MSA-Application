@@ -71,6 +71,12 @@ logiky appky sa vďaka tomu nemusel meniť):
   RÁMEC dátumovej platnosti (obe podmienky musia platiť zároveň, aby sa
   alert operátorovi zobrazil — pozri `getPendingQualityAlerts()`).
   Spravuje sa v Administrácii → záložka "Quality Alerty".
+- `qualityAlertAcks` (doc id = `id`) — kto videl/potvrdil ktorý Quality
+  Alert: `{id, qualityAlertId, operatorName, ackedAt}`. Zapisuje sa pri
+  kliknutí na "Rozumiem, pokračovať" na `#screen-quality-alert`. Zámerne
+  samostatná kolekcia (nie pole vnútri `qualityAlerts` doc), aby zápisy
+  od viacerých operátorov naraz nekolidovali. Zobrazuje sa v
+  Administrácii → "Quality Alerty" pri každom alerte ("Videli: ...").
 
 Poznámka k typom: Firestore vracia dátumové polia (`createdAt`,
 `startedAt`, `finishedAt`) ako `Timestamp` objekty, nie JS `Date`. Wrapper
@@ -107,7 +113,28 @@ nekonvertujú, keďže sa nikde spätne nečítajú.
   "Rozumiem, pokračovať"); viac alertov sa ukáže postupne za sebou
   (`pendingAlertsQueue`, `showNextQualityAlert()` si volá samo seba, kým
   front nie je prázdny, potom prejde na `#screen-test-eval`). Žiadny
-  alert nespĺňa podmienky → žiadny medzikrok, rovno na test.
+  alert nespĺňa podmienky → žiadny medzikrok, rovno na test. Klik na
+  "Rozumiem, pokračovať" zapíše potvrdenie do novej kolekcie
+  `qualityAlertAcks` (`{id, qualityAlertId, operatorName, ackedAt}`) —
+  `currentQualityAlertShown` drží referenciu na práve zobrazený alert,
+  aby continue-handler vedel, ktorý alert a ktorý operátor (z
+  `currentAttempt.operatorName`) potvrdiť; zápis je fire-and-forget
+  (neblokuje prechod na ďalší alert/test). V Administrácii →
+  "Quality Alerty" sa pri každom alerte zobrazuje "Videli (N): meno
+  (dátum), …" — zoznam sa pri otvorení záložky vždy **refetchuje
+  z Firestore** (nie z cache z `init()`), keďže potvrdenia pribúdajú
+  z iných zariadení/relácií operátorov, rovnako ako to robí Reporty pre
+  `attempts`.
+- **Rozbehnutý test sa MUSÍ dokončiť na jedno sedenie — inak sa zahodí.**
+  Ak operátor počas testu (vrátane Quality Alert medzikroku) prepne do
+  Administrácie, `switchMode('admin')` rovno vynuluje `currentAttempt`,
+  `pendingAlertsQueue` aj `currentQualityAlertShown`. Po návrate do Test
+  módu tak appka nezobrazí rozohraný test (ani rozohraný Quality Alert)
+  — `refreshTestModeEntry()` vidí `currentAttempt===null` a ukáže znova
+  štart (meno/sken). Keďže sa do `attempts` zapisuje výhradne v
+  `finishAttempt()` (až po zodpovedaní všetkých fotiek), nedokončený
+  pokus sa nikdy predtým ani teraz nezapísal do reportingu — táto úprava
+  len odstraňuje možnosť rozohraný test **obnoviť** prepnutím záložiek.
 - Hodnotenie fotka po fotke: veľká fotka, 3 tlačidlá (OK/Hranične OK/NOK,
   klávesy 1/2/3), šípky/klávesy ←→, poznámka k fotke, filmový pás
   s farebným stavom, auto-presun na ďalšiu nezodpovedanú fotku.
