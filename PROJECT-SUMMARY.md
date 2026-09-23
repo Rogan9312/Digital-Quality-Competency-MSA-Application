@@ -80,8 +80,21 @@ logiky appky sa vďaka tomu nemusel meniť):
   Alert: `{id, qualityAlertId, operatorName, ackedAt}`. Zapisuje sa pri
   kliknutí na "Rozumiem, pokračovať" na `#screen-quality-alert`. Zámerne
   samostatná kolekcia (nie pole vnútri `qualityAlerts` doc), aby zápisy
-  od viacerých operátorov naraz nekolidovali. Zobrazuje sa v
-  Administrácii → "Quality Alerty" pri každom alerte ("Videli: ...").
+  od viacerých operátorov naraz nekolidovali.
+
+  **Zobrazenie "kto videl":** V Administrácii → "Quality Alerty" má každá
+  karta alertu riadok políčok — jedno pre každého registrovaného
+  operátora (`allOperators`, zoradení podľa mena), zelené s dátumom
+  ("Meno (23.9.2026)") ak ho videl, sivé len s menom ak nie. Zoznam
+  kariet je teraz **mriežka** (`#qalerts-list{display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(230px,1fr))}`), nie
+  jeden stĺpec — pri viacerých alertoch sa ich zmestí vedľa seba 2–3
+  podľa šírky okna, kompaktnejší prehľad. Párovanie je podľa
+  `operatorName` reťazca (nie cudzieho kľúča) — sedí to s tým, že
+  `attempts.operatorName` aj `qualityAlertAcks.operatorName` sú tiež
+  len reťazce, a "kto ešte nevidel" má zmysel len voči pevnému zoznamu
+  registrovaných operátorov (`operators`), nie voči ľubovoľne ručne
+  napísaným menám.
 
 Poznámka k typom: Firestore vracia dátumové polia (`createdAt`,
 `startedAt`, `finishedAt`) ako `Timestamp` objekty, nie JS `Date`. Wrapper
@@ -238,6 +251,19 @@ Päť podzáložiek:
      `tierFor(pct) = pct>=90 ? 'ok' : (pct>=80 ? 'warn' : 'nok')`
      100–90 % = Spôsobilý, 90–80 % = Podmienečne spôsobilý, pod 80 % =
      Nespôsobilý. Tento prah sa používa konzistentne vo všetkých grafoch.
+   - **"Quality Alerty — prehľad"** — samostatná karta, nezávislá od
+     filtrov Sekcia/Operátor/Od/Do vyššie (počíta cez všetky Sekcie).
+     Riadky = aktuálne vydané alerty (`getCurrentlyIssuedQualityAlerts()`
+     — `isActive` a v dátumovej platnosti, naprieč sekciami, zoradené od
+     najstaršieho), so stĺpcom "Dní" (koľko dní je alert v platnosti).
+     Stĺpce = registrovaní operátori. Bunka = zelená ✓ s dátumom (videl)
+     alebo červená ✕ (ešte nevidel) — `renderQaDashboardMatrix()`, HTML
+     string (kvôli dynamickému počtu stĺpcov podľa počtu operátorov,
+     rovnaký prístup ako `build*ChartSvg` funkcie). Horizontálne aj
+     vertikálne scrollovateľné/resize-ovateľné (`.dash-qa-matrix-wrap`,
+     rovnaký vzor ako `.scroll-box`/`.resizable-box`, len s `overflow:auto`
+     namiesto `overflow-y:auto`, keďže stĺpcov môže byť veľa). Dáta sa
+     refetchujú z Firestore vždy pri otvorení Dashboard záložky.
 
 ## Dôležité implementačné detaily / gotchas
 - **Fotky ako base64 priamo vo Firestore, zámerne bez Firebase Storage**

@@ -287,14 +287,30 @@
   .badge-toggle{cursor:pointer;border:none;font-family:var(--font-mono);}
   .badge-toggle:hover{opacity:0.82;}
 
-  .qa-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-m);padding:14px 16px;margin-bottom:10px;}
+  #qalerts-list{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;align-items:start;}
+  .qa-card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius-m);padding:14px 16px;display:flex;flex-direction:column;}
   .qa-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;}
   .qa-card-head strong{font-size:14px;}
   .qa-card-meta{font-size:12px;color:var(--ink-soft);margin-bottom:6px;}
   .qa-card-desc{font-size:13px;color:var(--ink);margin-bottom:10px;white-space:pre-wrap;}
-  .qa-card-acks{font-size:11.5px;color:var(--ink-soft);margin-bottom:10px;padding-top:8px;border-top:1px dashed var(--line);}
-  .qa-card-actions{display:flex;gap:8px;}
-  .qa-card-thumb{width:100%;max-height:120px;object-fit:cover;border-radius:4px;margin-bottom:8px;display:block;}
+  .qa-card-acks{margin-bottom:10px;padding-top:8px;border-top:1px dashed var(--line);}
+  .qa-card-acks-label{font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.3px;color:var(--ink-faint);margin-bottom:5px;}
+  .qa-ops-grid{display:flex;flex-wrap:wrap;gap:5px;}
+  .qa-op-chip{font-size:10.5px;padding:3px 7px;border-radius:3px;font-family:var(--font-mono);white-space:nowrap;}
+  .qa-op-chip.seen{background:var(--ok-bg);color:var(--ok);}
+  .qa-op-chip.unseen{background:#EDEFF2;color:var(--ink-faint);}
+
+  .dash-qa-matrix-wrap{height:200px;overflow:auto;resize:vertical;min-height:80px;max-height:70vh;border:1px dashed transparent;border-radius:var(--radius-s);}
+  .dash-qa-matrix-wrap:hover{border-color:var(--line-strong);}
+  .qa-matrix-table{font-size:11px;}
+  .qa-matrix-table th{white-space:nowrap;}
+  .qa-matrix-name{display:flex;align-items:center;gap:6px;}
+  .qa-matrix-thumb{width:22px;height:22px;object-fit:cover;border-radius:3px;flex:none;}
+  .qa-matrix-cell{text-align:center;font-weight:700;width:34px;}
+  .qa-matrix-cell.seen{background:var(--ok-bg);color:var(--ok);}
+  .qa-matrix-cell.unseen{background:var(--nok-bg);color:var(--nok);}
+  .qa-card-actions{display:flex;gap:8px;margin-top:auto;}
+  .qa-card-thumb{width:100%;height:110px;object-fit:cover;border-radius:4px;margin-bottom:8px;display:block;}
 
   .section-gap{margin-top:30px;}
   .empty-state{text-align:center;padding:50px 20px;color:var(--ink-soft);font-size:13.5px;}
@@ -934,6 +950,13 @@
                 </table>
               </div>
               <div class="empty-state" id="dash-matrix-empty" style="display:none;">Zatiaľ žiadne dáta.</div>
+            </div>
+
+            <div class="card dash-card">
+              <h3 class="dash-card-title">Quality Alerty — prehľad</h3>
+              <p class="dash-card-sub" id="dash-qa-summary">Aktuálne vydané: 0</p>
+              <div class="dash-qa-matrix-wrap" id="dash-qa-matrix-wrap"></div>
+              <div class="empty-state" id="dash-qa-matrix-empty" style="display:none;">Zatiaľ žiadne aktuálne vydané Quality Alerty.</div>
             </div>
 
           </div>
@@ -1815,12 +1838,28 @@
         card.appendChild(desc);
       }
 
-      var acks = allQualityAlertAcks.filter(function(a){ return a.qualityAlertId===qa.id; })
-        .sort(function(a,b){ return new Date(b.ackedAt) - new Date(a.ackedAt); });
       var acksEl=document.createElement('div'); acksEl.className='qa-card-acks';
-      acksEl.textContent = acks.length
-        ? ('Videli (' + acks.length + '): ' + acks.map(function(a){ return a.operatorName + ' (' + new Date(a.ackedAt).toLocaleDateString('sk-SK') + ')'; }).join(', '))
-        : 'Zatiaľ nikto z operátorov nepotvrdil.';
+      var acksLabel=document.createElement('div'); acksLabel.className='qa-card-acks-label'; acksLabel.textContent='Kto videl';
+      acksEl.appendChild(acksLabel);
+      if(allOperators.length===0){
+        var noOps=document.createElement('div'); noOps.className='dash-card-sub'; noOps.style.margin='0';
+        noOps.textContent='Zatiaľ nie sú zaregistrovaní žiadni operátori (záložka Operátori).';
+        acksEl.appendChild(noOps);
+      } else {
+        var ackMap = {};
+        allQualityAlertAcks.filter(function(a){ return a.qualityAlertId===qa.id; }).forEach(function(a){
+          if(!ackMap[a.operatorName] || new Date(a.ackedAt) > new Date(ackMap[a.operatorName])) ackMap[a.operatorName] = a.ackedAt;
+        });
+        var opsGrid=document.createElement('div'); opsGrid.className='qa-ops-grid';
+        allOperators.slice().sort(function(a,b){ return a.name.localeCompare(b.name,'sk'); }).forEach(function(op){
+          var seenAt = ackMap[op.name];
+          var opChip=document.createElement('span');
+          opChip.className = 'qa-op-chip ' + (seenAt ? 'seen' : 'unseen');
+          opChip.textContent = seenAt ? (op.name + ' (' + new Date(seenAt).toLocaleDateString('sk-SK') + ')') : op.name;
+          opsGrid.appendChild(opChip);
+        });
+        acksEl.appendChild(opsGrid);
+      }
       card.appendChild(acksEl);
 
       var actions=document.createElement('div'); actions.className='qa-card-actions';
@@ -1900,9 +1939,10 @@
     /* Refetch fresh, like Reporty does for "attempts" — acks come from
        operators on other devices/sessions, so the cached array from init()
        could be stale by the time the admin opens this tab. */
-    Promise.all([idbGetAll('qualityAlerts'), idbGetAll('qualityAlertAcks')]).then(function(res){
+    Promise.all([idbGetAll('qualityAlerts'), idbGetAll('qualityAlertAcks'), idbGetAll('operators')]).then(function(res){
       allQualityAlerts = res[0] || [];
       allQualityAlertAcks = res[1] || [];
+      allOperators = res[2] || [];
       renderQaList();
     });
   });
@@ -2160,17 +2200,23 @@
   ========================================================= */
   var qaScreenImg=document.getElementById('qa-screen-img'), qaScreenTitle=document.getElementById('qa-screen-title'), qaScreenDesc=document.getElementById('qa-screen-desc');
 
-  function getPendingQualityAlerts(){
-    var batch = allBatches.find(function(b){ return b.id===activeBatchId; });
-    var areaId = batch ? batch.areaId : null;
-    if(!areaId) return [];
+  /* Alerts currently in effect (isActive + within date range), regardless
+     of Sekcia — used for the dashboard overview across all Sekcie. */
+  function getCurrentlyIssuedQualityAlerts(){
     var today = new Date(); today.setHours(0,0,0,0);
     return allQualityAlerts.filter(function(qa){
-      if(!qa.isActive || qa.areaId!==areaId) return false;
+      if(!qa.isActive) return false;
       var from = new Date(qa.dateFrom); from.setHours(0,0,0,0);
       var to = computeQaDateTo(qa); // already normalized to midnight
       return today>=from && today<=to;
     });
+  }
+
+  function getPendingQualityAlerts(){
+    var batch = allBatches.find(function(b){ return b.id===activeBatchId; });
+    var areaId = batch ? batch.areaId : null;
+    if(!areaId) return [];
+    return getCurrentlyIssuedQualityAlerts().filter(function(qa){ return qa.areaId===areaId; });
   }
 
   function showNextQualityAlert(){
@@ -2731,6 +2777,16 @@
   }
 
   function renderDashboard(){
+    /* Independent of the attempts-based charts below — refetch fresh, since
+       alerts/acks/operators change from other sessions (like Reporty does
+       for "attempts"), then draw the Quality Alert overview matrix. */
+    Promise.all([idbGetAll('operators'), idbGetAll('qualityAlerts'), idbGetAll('qualityAlertAcks')]).then(function(res){
+      allOperators = res[0] || [];
+      allQualityAlerts = res[1] || [];
+      allQualityAlertAcks = res[2] || [];
+      renderQaDashboardMatrix();
+    });
+
     refreshDashboardOperators().then(function(){
       var batchIds = batchIdsForSelectedArea();
       var opVal = dashOperatorSelect.value || 'all';
@@ -2895,6 +2951,61 @@
       var td5=document.createElement('td'); td5.textContent=recommendationFor(tier, s.count, medianCount); tr.appendChild(td5);
       matrixTbody.appendChild(tr);
     });
+  }
+
+  /* Quality Alert overview: rows = currently issued alerts (isActive + in
+     date range, across all Sekcie), columns = registered operators, cell =
+     zelená (videl, s dátumom) / červená (ešte nevidel). Built as an HTML
+     string (like the SVG chart builders) since the column count is dynamic. */
+  function renderQaDashboardMatrix(){
+    var wrap = document.getElementById('dash-qa-matrix-wrap');
+    var empty = document.getElementById('dash-qa-matrix-empty');
+    var summary = document.getElementById('dash-qa-summary');
+
+    var issued = getCurrentlyIssuedQualityAlerts().sort(function(a,b){ return new Date(a.dateFrom) - new Date(b.dateFrom); });
+    var ops = allOperators.slice().sort(function(a,b){ return a.name.localeCompare(b.name,'sk'); });
+
+    summary.textContent = 'Aktuálne vydané: ' + issued.length + (ops.length ? (' · Operátorov na kontrolu: ' + ops.length) : '');
+
+    if(issued.length===0 || ops.length===0){
+      wrap.innerHTML = '';
+      empty.textContent = issued.length===0
+        ? 'Zatiaľ žiadne aktuálne vydané Quality Alerty.'
+        : 'Zatiaľ nie sú zaregistrovaní žiadni operátori (záložka Operátori).';
+      empty.style.display = 'block';
+      return;
+    }
+    empty.style.display = 'none';
+
+    var today = new Date(); today.setHours(0,0,0,0);
+    var html = '<table class="rtable qa-matrix-table"><thead><tr><th>Alert</th><th>Dní</th>';
+    ops.forEach(function(op){ html += '<th>' + escapeHtml(op.name) + '</th>'; });
+    html += '</tr></thead><tbody>';
+
+    issued.forEach(function(qa){
+      var from = new Date(qa.dateFrom); from.setHours(0,0,0,0);
+      var daysActive = Math.floor((today - from) / 86400000) + 1;
+      var ackMap = {};
+      allQualityAlertAcks.filter(function(a){ return a.qualityAlertId===qa.id; }).forEach(function(a){
+        if(!ackMap[a.operatorName] || new Date(a.ackedAt) > new Date(ackMap[a.operatorName])) ackMap[a.operatorName] = a.ackedAt;
+      });
+
+      html += '<tr><td><div class="qa-matrix-name">';
+      if(qa.imageData) html += '<img class="qa-matrix-thumb" src="' + qa.imageData + '" alt="">';
+      html += '<span>' + escapeHtml(qa.title) + '</span></div></td>';
+      html += '<td>' + daysActive + '</td>';
+      ops.forEach(function(op){
+        var seenAt = ackMap[op.name];
+        if(seenAt){
+          html += '<td class="qa-matrix-cell seen" title="' + escapeHtml(op.name) + ' — videl ' + new Date(seenAt).toLocaleDateString('sk-SK') + '">&#10003;</td>';
+        } else {
+          html += '<td class="qa-matrix-cell unseen" title="' + escapeHtml(op.name) + ' — ešte nevidel">&#10007;</td>';
+        }
+      });
+      html += '</tr>';
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
   }
 
   function buildLineChartSvg(points, height){
