@@ -535,7 +535,6 @@
       <section id="screen-test-eval" class="screen">
         <div class="eval-status-row">
           <div class="pos" id="t-eval-pos">Fotka 1 / 1</div>
-          <div class="filename" id="t-eval-filename"></div>
           <div class="status-line" id="t-eval-operator"></div>
         </div>
         <div class="photo-stage">
@@ -2276,7 +2275,7 @@
     beginAttempt(name);
   });
 
-  var tEvalPos=document.getElementById('t-eval-pos'), tEvalFilename=document.getElementById('t-eval-filename'), tEvalOperator=document.getElementById('t-eval-operator');
+  var tEvalPos=document.getElementById('t-eval-pos'), tEvalOperator=document.getElementById('t-eval-operator');
   var tStageImg=document.getElementById('t-stage-img'), tStageFlag=document.getElementById('t-stage-flag');
   var tBtnPrev=document.getElementById('t-btn-prev'), tBtnNext=document.getElementById('t-btn-next');
   var tFieldNote=document.getElementById('t-field-note');
@@ -2288,7 +2287,6 @@
     var p = activePhotos[currentAttempt.index];
     var ans = currentAttempt.answers[p.id];
     tEvalPos.textContent = 'Fotka ' + (currentAttempt.index+1) + ' / ' + activePhotos.length;
-    tEvalFilename.textContent = p.name;
     tEvalOperator.textContent = currentAttempt.operatorName;
     tStageImg.src = p.url; tStageImg.alt = p.name;
     tFieldNote.value = ans ? (ans.note||'') : '';
