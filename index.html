@@ -349,6 +349,11 @@
   .dash-card-title{font-size:13px;font-weight:600;margin:0 0 4px 0;}
   .dash-card-sub{font-size:11.5px;color:var(--ink-soft);margin:0 0 10px 0;line-height:1.4;}
 
+  .metric-switch{display:inline-flex;border:1px solid var(--line-strong);border-radius:var(--radius-s);overflow:hidden;flex:none;}
+  .metric-switch button{border:none;background:#fff;color:var(--ink-faint);font-size:10.5px;font-weight:600;padding:5px 9px;cursor:pointer;font-family:inherit;white-space:nowrap;}
+  .metric-switch button:not(:last-child){border-right:1px solid var(--line-strong);}
+  .metric-switch button.active{background:var(--navy);color:#fff;}
+
   #dash-chart-wrap svg,#dash-bar-wrap svg,#dash-scatter-wrap svg,#dash-pie-wrap svg{width:100%;height:auto;display:block;}
   .chart-sm{max-height:150px;overflow:hidden;}
   #dash-chart-wrap .chart-pt{cursor:pointer;}
@@ -907,9 +912,15 @@
               <div class="card dash-card dash-card-sm">
                 <div class="row-between" style="margin-bottom:4px;">
                   <h3 class="dash-card-title" id="dash-chart-title">Vývoj úspešnosti v čase</h3>
-                  <div class="trend-pill" id="dash-trend-pill">
-                    <span class="trend-arrow" id="dash-trend-arrow">—</span>
-                    <span id="dash-trend-text"></span>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <div class="metric-switch" data-widget="trend">
+                      <button type="button" data-metric="score" class="active">Úspešnosť</button>
+                      <button type="button" data-metric="detection">Odhaliteľnosť vád</button>
+                    </div>
+                    <div class="trend-pill" id="dash-trend-pill">
+                      <span class="trend-arrow" id="dash-trend-arrow">—</span>
+                      <span id="dash-trend-text"></span>
+                    </div>
                   </div>
                 </div>
                 <p class="dash-card-sub" style="margin:0 0 8px 0;">Čierna čiara = jednotlivé merania, prerušovaná farebná = trendová línia</p>
@@ -918,7 +929,13 @@
               </div>
 
               <div class="card dash-card dash-card-sm">
-                <h3 class="dash-card-title">Spôsobilosť operátorov</h3>
+                <div class="row-between" style="margin-bottom:4px;">
+                  <h3 class="dash-card-title" style="margin:0;">Spôsobilosť operátorov</h3>
+                  <div class="metric-switch" data-widget="pie">
+                    <button type="button" data-metric="score" class="active">Úspešnosť</button>
+                    <button type="button" data-metric="detection">Odhaliteľnosť vád</button>
+                  </div>
+                </div>
                 <p class="dash-card-sub">100–90 % spôsobilý · 90–80 % podmienečne · pod 80 % nespôsobilý</p>
                 <div class="pie-layout">
                   <div id="dash-pie-wrap" class="chart-pie"></div>
@@ -927,7 +944,13 @@
               </div>
 
               <div class="card dash-card dash-card-sm">
-                <h3 class="dash-card-title">Vyžaduje pozornosť / vzory</h3>
+                <div class="row-between" style="margin-bottom:4px;">
+                  <h3 class="dash-card-title" style="margin:0;">Vyžaduje pozornosť / vzory</h3>
+                  <div class="metric-switch" data-widget="highlights">
+                    <button type="button" data-metric="score" class="active">Úspešnosť</button>
+                    <button type="button" data-metric="detection">Odhaliteľnosť vád</button>
+                  </div>
+                </div>
                 <p class="dash-card-sub">Najslabší (veľa testov) a najlepší operátori</p>
                 <div id="dash-highlights"></div>
               </div>
@@ -935,12 +958,24 @@
 
             <div class="dash-grid">
               <div class="card dash-card">
-                <h3 class="dash-card-title">Porovnanie operátorov — úspešnosť</h3>
+                <div class="row-between" style="margin-bottom:4px;">
+                  <h3 class="dash-card-title" id="dash-bar-title" style="margin:0;">Porovnanie operátorov — Úspešnosť</h3>
+                  <div class="metric-switch" data-widget="bar">
+                    <button type="button" data-metric="score" class="active">Úspešnosť</button>
+                    <button type="button" data-metric="detection">Odhaliteľnosť vád</button>
+                  </div>
+                </div>
                 <div id="dash-bar-wrap" class="scroll-box"></div>
                 <div class="empty-state" id="dash-bar-empty" style="display:none;">Zatiaľ žiadne dáta.</div>
               </div>
               <div class="card dash-card">
-                <h3 class="dash-card-title">Počet testov × úspešnosť</h3>
+                <div class="row-between" style="margin-bottom:4px;">
+                  <h3 class="dash-card-title" id="dash-scatter-title" style="margin:0;">Počet testov × úspešnosť</h3>
+                  <div class="metric-switch" data-widget="scatter">
+                    <button type="button" data-metric="score" class="active">Úspešnosť</button>
+                    <button type="button" data-metric="detection">Odhaliteľnosť vád</button>
+                  </div>
+                </div>
                 <p class="dash-card-sub">Vpravo hore = dobrí a skúsení. Vpravo dole = veľa testov, stále zle.</p>
                 <div id="dash-scatter-wrap" class="resizable-box" style="height:300px;"></div>
                 <div class="empty-state" id="dash-scatter-empty" style="display:none;">Zatiaľ žiadne dáta.</div>
@@ -948,8 +983,14 @@
             </div>
 
             <div class="card dash-card">
-              <h3 class="dash-card-title">Matica spôsobilosti operátorov</h3>
-              <p class="dash-card-sub">100–90 % = spôsobilý · 90–80 % = podmienečne spôsobilý · pod 80 % = nespôsobilý</p>
+              <div class="row-between" style="margin-bottom:4px;">
+                <h3 class="dash-card-title" style="margin:0;">Matica spôsobilosti operátorov</h3>
+                <div class="metric-switch" data-widget="matrix">
+                  <button type="button" data-metric="score">Úspešnosť</button>
+                  <button type="button" data-metric="detection" class="active">Odhaliteľnosť vád</button>
+                </div>
+              </div>
+              <p class="dash-card-sub">100–90 % = spôsobilý · 90–80 % = podmienečne spôsobilý · pod 80 % = nespôsobilý · zoradené od najlepšieho po najhorší podľa zvoleného ukazovateľa</p>
               <div class="scroll-box" style="height:200px;">
                 <table class="rtable" id="dash-matrix-table">
                   <thead><tr><th>Operátor</th><th>Úspešnosť</th><th>Testov</th><th>⚠ Neodhalené vady</th><th>Spôsobilosť</th><th>Odhaliteľnosť vád</th><th>Odporúčanie</th></tr></thead>
@@ -2966,6 +3007,29 @@
   var dashTrendText = document.getElementById('dash-trend-text');
   var dashEmpty = document.getElementById('dash-empty');
 
+  /* Každý graf/tabuľka v Dashboarde má vlastný prepínač "Úspešnosť" /
+     "Odhaliteľnosť vád" (.metric-switch, data-widget) — nezávisle od
+     seba, takže si človek môže napr. nechať Maticu na odhaliteľnosti
+     vád a zvyšok na úspešnosti. Matica má zámerne default 'detection'. */
+  var dashMetricMode = { trend:'score', pie:'score', highlights:'score', bar:'score', scatter:'score', matrix:'detection' };
+  function metricValueOf(s, metric){ return metric==='detection' ? s.detectionAvg : s.avg; }
+  function metricLabel(metric){ return metric==='detection' ? 'Odhaliteľnosť vád' : 'Úspešnosť'; }
+  var lastComparisonAttempts = [];
+  var lastTrendScoped = [], lastTrendOpVal = 'all';
+
+  Array.prototype.forEach.call(document.querySelectorAll('.metric-switch button'), function(btn){
+    btn.addEventListener('click', function(){
+      var widget = btn.parentElement.getAttribute('data-widget');
+      var metric = btn.getAttribute('data-metric');
+      if(dashMetricMode[widget]===metric) return;
+      dashMetricMode[widget] = metric;
+      Array.prototype.forEach.call(btn.parentElement.querySelectorAll('button'), function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      if(widget==='trend') renderTrendChart(lastTrendScoped, lastTrendOpVal);
+      else renderOperatorComparison(lastComparisonAttempts);
+    });
+  });
+
   function refreshDashboardFilters(){
     var prevArea = dashAreaSelect.value || 'all';
     dashAreaSelect.innerHTML = '';
@@ -3033,65 +3097,79 @@
         if(fromVal){ var fromTs0=new Date(fromVal+'T00:00:00').getTime(); scoped = scoped.filter(function(a){ return new Date(a.finishedAt).getTime()>=fromTs0; }); }
         if(toVal){ var toTs0=new Date(toVal+'T23:59:59').getTime(); scoped = scoped.filter(function(a){ return new Date(a.finishedAt).getTime()<=toTs0; }); }
 
+        lastComparisonAttempts = scoped;
         renderOperatorComparison(scoped);
 
-        var attempts = opVal!=='all' ? scoped.filter(function(a){ return a.operatorName===opVal; }) : scoped.slice();
-        attempts.sort(function(a,b){ return new Date(a.finishedAt) - new Date(b.finishedAt); });
-
-        var points;
-        if(opVal!=='all'){
-          dashChartTitle.textContent = 'Vývoj úspešnosti operátora „' + opVal + '“ v čase';
-          points = attempts.map(function(a){ return { date:new Date(a.finishedAt), y:a.scorePercent, label:a.operatorName+' — '+a.scorePercent+' %' }; });
-        } else {
-          dashChartTitle.textContent = 'Priemerná úspešnosť operátorov v čase';
-          var byDay = {};
-          attempts.forEach(function(a){
-            var day = new Date(a.finishedAt).toISOString().slice(0,10);
-            if(!byDay[day]) byDay[day] = [];
-            byDay[day].push(a.scorePercent);
-          });
-          points = Object.keys(byDay).sort().map(function(day){
-            var vals = byDay[day];
-            var avg = Math.round(vals.reduce(function(s,v){ return s+v; },0)/vals.length);
-            return { date:new Date(day+'T12:00:00'), y:avg, label:day+' — priemer '+avg+' % ('+vals.length+' test.)' };
-          });
-        }
-
-        var trendPill = document.getElementById('dash-trend-pill');
-        var trendArrow = document.getElementById('dash-trend-arrow');
-
-        if(points.length===0){
-          dashChartWrap.innerHTML=''; dashEmpty.style.display='block';
-          dashTrendText.textContent=''; trendArrow.textContent='—'; trendPill.className='trend-pill trend-flat';
-          return;
-        }
-        dashEmpty.style.display='none';
-        dashChartWrap.innerHTML = buildLineChartSvg(points, 180);
-
-        if(points.length>=2){
-          var mid = Math.floor(points.length/2);
-          var firstHalf = points.slice(0, Math.max(mid,1));
-          var secondHalf = points.slice(mid);
-          var avgFirst = firstHalf.reduce(function(s,p){ return s+p.y; },0)/firstHalf.length;
-          var avgSecond = secondHalf.reduce(function(s,p){ return s+p.y; },0)/secondHalf.length;
-          var delta = Math.round(avgSecond - avgFirst);
-          var sign = delta>0 ? '+' : '';
-          if(delta>=3){
-            trendPill.className='trend-pill trend-up'; trendArrow.textContent='▲';
-            dashTrendText.textContent = 'Zlepšuje sa (' + sign + delta + ' percentuálnych bodov)';
-          } else if(delta<=-3){
-            trendPill.className='trend-pill trend-down'; trendArrow.textContent='▼';
-            dashTrendText.textContent = 'Zhoršuje sa (' + sign + delta + ' percentuálnych bodov)';
-          } else {
-            trendPill.className='trend-pill trend-flat'; trendArrow.textContent='▬';
-            dashTrendText.textContent = 'Stabilné (' + sign + delta + ' percentuálnych bodov)';
-          }
-        } else {
-          trendPill.className='trend-pill trend-flat'; trendArrow.textContent='—';
-          dashTrendText.textContent = 'Potrebné aspoň 2 merania';
-        }
+        lastTrendScoped = scoped;
+        lastTrendOpVal = opVal;
+        renderTrendChart(scoped, opVal);
       });
     });
+  }
+
+  /* Vyextrahované z renderDashboard(), aby sa to vedelo prekresliť samostatne
+     (lacno, bez nového fetchu z Firestore) pri zmene prepínača Úspešnosť/
+     Odhaliteľnosť vád na grafe vývoja v čase — pozri .metric-switch
+     [data-widget="trend"] vyššie. */
+  function renderTrendChart(scoped, opVal){
+    var metric = dashMetricMode.trend;
+    var valueField = metric==='detection' ? 'detectionScorePercent' : 'scorePercent';
+
+    var attempts = opVal!=='all' ? scoped.filter(function(a){ return a.operatorName===opVal; }) : scoped.slice();
+    attempts.sort(function(a,b){ return new Date(a.finishedAt) - new Date(b.finishedAt); });
+
+    var points;
+    if(opVal!=='all'){
+      dashChartTitle.textContent = (metric==='detection' ? 'Vývoj odhaliteľnosti vád operátora „' : 'Vývoj úspešnosti operátora „') + opVal + '“ v čase';
+      points = attempts.map(function(a){ return { date:new Date(a.finishedAt), y:a[valueField], label:a.operatorName+' — '+a[valueField]+' %' }; });
+    } else {
+      dashChartTitle.textContent = metric==='detection' ? 'Priemerná odhaliteľnosť vád operátorov v čase' : 'Priemerná úspešnosť operátorov v čase';
+      var byDay = {};
+      attempts.forEach(function(a){
+        var day = new Date(a.finishedAt).toISOString().slice(0,10);
+        if(!byDay[day]) byDay[day] = [];
+        byDay[day].push(a[valueField]);
+      });
+      points = Object.keys(byDay).sort().map(function(day){
+        var vals = byDay[day];
+        var avg = Math.round(vals.reduce(function(s,v){ return s+v; },0)/vals.length);
+        return { date:new Date(day+'T12:00:00'), y:avg, label:day+' — priemer '+avg+' % ('+vals.length+' test.)' };
+      });
+    }
+
+    var trendPill = document.getElementById('dash-trend-pill');
+    var trendArrow = document.getElementById('dash-trend-arrow');
+
+    if(points.length===0){
+      dashChartWrap.innerHTML=''; dashEmpty.style.display='block';
+      dashTrendText.textContent=''; trendArrow.textContent='—'; trendPill.className='trend-pill trend-flat';
+      return;
+    }
+    dashEmpty.style.display='none';
+    dashChartWrap.innerHTML = buildLineChartSvg(points, 180);
+
+    if(points.length>=2){
+      var mid = Math.floor(points.length/2);
+      var firstHalf = points.slice(0, Math.max(mid,1));
+      var secondHalf = points.slice(mid);
+      var avgFirst = firstHalf.reduce(function(s,p){ return s+p.y; },0)/firstHalf.length;
+      var avgSecond = secondHalf.reduce(function(s,p){ return s+p.y; },0)/secondHalf.length;
+      var delta = Math.round(avgSecond - avgFirst);
+      var sign = delta>0 ? '+' : '';
+      if(delta>=3){
+        trendPill.className='trend-pill trend-up'; trendArrow.textContent='▲';
+        dashTrendText.textContent = 'Zlepšuje sa (' + sign + delta + ' percentuálnych bodov)';
+      } else if(delta<=-3){
+        trendPill.className='trend-pill trend-down'; trendArrow.textContent='▼';
+        dashTrendText.textContent = 'Zhoršuje sa (' + sign + delta + ' percentuálnych bodov)';
+      } else {
+        trendPill.className='trend-pill trend-flat'; trendArrow.textContent='▬';
+        dashTrendText.textContent = 'Stabilné (' + sign + delta + ' percentuálnych bodov)';
+      }
+    } else {
+      trendPill.className='trend-pill trend-flat'; trendArrow.textContent='—';
+      dashTrendText.textContent = 'Potrebné aspoň 2 merania';
+    }
   }
 
   function computeOperatorStats(attempts){
@@ -3143,31 +3221,41 @@
     }
     barEmpty.style.display='none'; scatterEmpty.style.display='none'; matrixEmpty.style.display='none';
 
-    barWrap.innerHTML = buildBarChartSvg(stats.slice().sort(function(a,b){ return a.avg-b.avg; }));
-    scatterWrap.innerHTML = buildScatterChartSvg(stats);
-
     var medianCount = stats.slice().sort(function(a,b){ return a.count-b.count; })[Math.floor(stats.length/2)].count;
 
-    // Pie chart: distribution of operators across capability tiers
+    // Porovnanie operátorov (bar chart) — vlastný prepínač metriky, vždy od najlepšieho po najhorší
+    var barMetric = dashMetricMode.bar;
+    document.getElementById('dash-bar-title').textContent = 'Porovnanie operátorov — ' + metricLabel(barMetric);
+    barWrap.innerHTML = buildBarChartSvg(stats.slice().sort(function(a,b){ return metricValueOf(b,barMetric)-metricValueOf(a,barMetric); }), barMetric);
+
+    // Počet testov × metrika (scatter) — vlastný prepínač metriky
+    var scatterMetric = dashMetricMode.scatter;
+    document.getElementById('dash-scatter-title').textContent = 'Počet testov × ' + metricLabel(scatterMetric);
+    scatterWrap.innerHTML = buildScatterChartSvg(stats, scatterMetric);
+
+    // Pie chart: distribution of operators across capability tiers — vlastný prepínač metriky
+    var pieMetric = dashMetricMode.pie;
     var counts = { ok:0, warn:0, nok:0 };
-    stats.forEach(function(s){ counts[tierFor(s.avg)]++; });
+    stats.forEach(function(s){ counts[tierFor(metricValueOf(s,pieMetric))]++; });
     pieWrap.innerHTML = buildPieChartSvg(counts);
     pieLegend.innerHTML =
       '<div class="pie-legend-row"><span class="pie-legend-dot" style="background:'+tierColor('ok')+'"></span>Spôsobilí <span class="pl-count">'+counts.ok+'</span></div>' +
       '<div class="pie-legend-row"><span class="pie-legend-dot" style="background:'+tierColor('warn')+'"></span>Podmienečne <span class="pl-count">'+counts.warn+'</span></div>' +
       '<div class="pie-legend-row"><span class="pie-legend-dot" style="background:'+tierColor('nok')+'"></span>Nespôsobilí <span class="pl-count">'+counts.nok+'</span></div>';
 
-    // Highlights: top 4 needing attention, top 2 role models (rewarding both score AND test count)
-    var attention = stats.filter(function(s){ return s.avg<80; })
-      .sort(function(a,b){ return (b.count-a.count) || (a.avg-b.avg); }).slice(0,4);
-    var roleModels = stats.filter(function(s){ return s.avg>=90; })
-      .sort(function(a,b){ return (b.avg+b.count) - (a.avg+a.count); }).slice(0,2);
+    // Highlights: top 4 needing attention, top 2 role models — vlastný prepínač metriky
+    var hlMetric = dashMetricMode.highlights;
+    var attention = stats.filter(function(s){ return metricValueOf(s,hlMetric)<80; })
+      .sort(function(a,b){ return (b.count-a.count) || (metricValueOf(a,hlMetric)-metricValueOf(b,hlMetric)); }).slice(0,4);
+    var roleModels = stats.filter(function(s){ return metricValueOf(s,hlMetric)>=90; })
+      .sort(function(a,b){ return (metricValueOf(b,hlMetric)+b.count) - (metricValueOf(a,hlMetric)+a.count); }).slice(0,2);
 
     function hlCardHtml(s, tier){
+      var val = metricValueOf(s, hlMetric);
       var flag = (tier==='nok' && s.count>=Math.max(medianCount,3)) ? '<div class="hl-card-flag">Veľa testov, stále zle</div>' : '';
       return '<div class="hl-card tier-'+tier+'">' +
         '<div class="hl-card-name">'+escapeHtml(s.name)+'</div>' +
-        '<div class="hl-card-pct">'+s.avg+' %</div>' +
+        '<div class="hl-card-pct">'+val+' %</div>' +
         '<div class="hl-card-count">'+s.count+' test'+(s.count===1?'':(s.count<5?'y':'ov'))+'</div>' +
         flag + '</div>';
     }
@@ -3180,21 +3268,26 @@
       : '<div class="dash-card-sub" style="margin:0;">Zatiaľ žiadni operátori nad 90 %.</div>';
     hlWrap.innerHTML = hlHtml;
 
-    // Full capability matrix table
+    // Matica spôsobilosti operátorov — vlastný prepínač metriky, zoradená
+    // od najlepšieho po najhorší podľa zvolenej metriky (default: odhaliteľnosť
+    // vád). Stĺpce Úspešnosť/Odhaliteľnosť vád majú VLASTNÉ farby odznakov
+    // (vždy podľa svojej vlastnej hodnoty) — prepínač riadi len poradie
+    // riadkov a stĺpce Spôsobilosť/Odporúčanie.
+    var matrixMetric = dashMetricMode.matrix;
+    var matrixStats = stats.slice().sort(function(a,b){ return metricValueOf(b,matrixMetric)-metricValueOf(a,matrixMetric); });
     matrixTbody.innerHTML = '';
-    stats.forEach(function(s){
-      var tier = tierFor(s.avg);
+    matrixStats.forEach(function(s){
+      var tier = tierFor(metricValueOf(s, matrixMetric));
       var tr = document.createElement('tr');
       var td1=document.createElement('td'); td1.textContent=s.name; tr.appendChild(td1);
-      var td2=document.createElement('td'); var b=document.createElement('span'); b.className='badge '+tier; b.textContent=s.avg+' %'; td2.appendChild(b); tr.appendChild(td2);
+      var td2=document.createElement('td'); var b=document.createElement('span'); b.className='badge '+tierFor(s.avg); b.textContent=s.avg+' %'; td2.appendChild(b); tr.appendChild(td2);
       var td3=document.createElement('td'); td3.textContent=s.count; tr.appendChild(td3);
       var tdEsc=document.createElement('td');
       var escBadge=document.createElement('span'); escBadge.className='badge '+(s.escapes>0?'nok':'ok'); escBadge.textContent=s.escapes>0?('⚠ '+s.escapes):'0';
       tdEsc.appendChild(escBadge); tr.appendChild(tdEsc);
       var td4=document.createElement('td'); var b2=document.createElement('span'); b2.className='badge '+tier; b2.textContent=tierLabel(tier); td4.appendChild(b2); tr.appendChild(td4);
       var tdDet=document.createElement('td');
-      var detTier=tierFor(s.detectionAvg);
-      var detBadge=document.createElement('span'); detBadge.className='badge '+detTier; detBadge.textContent=s.detectionAvg+' %';
+      var detBadge=document.createElement('span'); detBadge.className='badge '+tierFor(s.detectionAvg); detBadge.textContent=s.detectionAvg+' %';
       detBadge.title='Odhaliteľnosť vád: aj Hranične OK sa tu počíta ako spozorovaná vada';
       tdDet.appendChild(detBadge); tr.appendChild(tdDet);
       var td5=document.createElement('td'); td5.textContent=recommendationFor(tier, s.count, medianCount); tr.appendChild(td5);
@@ -3346,7 +3439,8 @@
     return '<svg viewBox="0 0 '+size+' '+size+'" xmlns="http://www.w3.org/2000/svg">' + slices + '<circle cx="'+cx+'" cy="'+cy+'" r="'+holeR+'" fill="var(--panel)"/>' + centerLabel + '</svg>';
   }
 
-  function buildBarChartSvg(stats){
+  function buildBarChartSvg(stats, metric){
+    metric = metric || 'score';
     var W=800, H=Math.max(220, 46*stats.length+40), padL=140, padR=50, padT=10, padB=10;
     var innerW = W-padL-padR, innerH = H-padT-padB;
     var barH = Math.min(30, innerH/stats.length - 10);
@@ -3365,19 +3459,21 @@
     }).join('');
 
     var bars = stats.map(function(s, i){
+      var val = metricValueOf(s, metric);
       var y = padT + i*step + (step-barH)/2;
-      var w = (s.avg/100)*innerW;
-      var color = tierColor(tierFor(s.avg));
+      var w = (val/100)*innerW;
+      var color = tierColor(tierFor(val));
       var nameShort = s.name.length>16 ? s.name.slice(0,15)+'…' : s.name;
       return '<text x="'+(padL-10)+'" y="'+(y+barH/2+4)+'" text-anchor="end" font-size="12" fill="#1B2130" font-family="IBM Plex Sans, sans-serif">'+escapeHtml(nameShort)+'</text>' +
-        '<rect class="bar-rect" x="'+padL+'" y="'+y+'" width="'+Math.max(w,2)+'" height="'+barH+'" rx="3" fill="'+color+'"><title>'+escapeHtml(s.name)+' — '+s.avg+' % ('+s.count+' test.)</title></rect>' +
-        '<text x="'+(padL+w+8)+'" y="'+(y+barH/2+4)+'" font-size="12" font-weight="600" fill="'+color+'" font-family="IBM Plex Mono, monospace">'+s.avg+'%</text>';
+        '<rect class="bar-rect" x="'+padL+'" y="'+y+'" width="'+Math.max(w,2)+'" height="'+barH+'" rx="3" fill="'+color+'"><title>'+escapeHtml(s.name)+' — '+val+' % ('+s.count+' test.)</title></rect>' +
+        '<text x="'+(padL+w+8)+'" y="'+(y+barH/2+4)+'" font-size="12" font-weight="600" fill="'+color+'" font-family="IBM Plex Mono, monospace">'+val+'%</text>';
     }).join('');
 
     return '<svg viewBox="0 0 '+W+' '+H+'" xmlns="http://www.w3.org/2000/svg">' + zones + grid + bars + '</svg>';
   }
 
-  function buildScatterChartSvg(stats){
+  function buildScatterChartSvg(stats, metric){
+    metric = metric || 'score';
     var W=520, H=340, padL=46, padR=20, padT=16, padB=40;
     var innerW=W-padL-padR, innerH=H-padT-padB;
     var maxCount = Math.max.apply(null, stats.map(function(s){ return s.count; }));
@@ -3410,10 +3506,11 @@
     var xAxisLabel = '<text x="'+(padL+innerW/2)+'" y="'+(H-4)+'" text-anchor="middle" font-size="10" fill="#8A90A0">počet testov</text>';
 
     var dots = stats.map(function(s){
-      var x=xFor(s.count).toFixed(1), y=yFor(s.avg).toFixed(1);
-      var color = tierColor(tierFor(s.avg));
+      var val = metricValueOf(s, metric);
+      var x=xFor(s.count).toFixed(1), y=yFor(val).toFixed(1);
+      var color = tierColor(tierFor(val));
       var nameShort = s.name.length>12 ? s.name.slice(0,11)+'…' : s.name;
-      return '<circle class="scatter-pt" cx="'+x+'" cy="'+y+'" r="6" fill="'+color+'" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>'+escapeHtml(s.name)+' — '+s.avg+' %, '+s.count+' test.</title></circle>' +
+      return '<circle class="scatter-pt" cx="'+x+'" cy="'+y+'" r="6" fill="'+color+'" fill-opacity="0.85" stroke="#fff" stroke-width="1.5"><title>'+escapeHtml(s.name)+' — '+val+' %, '+s.count+' test.</title></circle>' +
         '<text x="'+x+'" y="'+(parseFloat(y)-10)+'" text-anchor="middle" font-size="9.5" fill="#5B6270" font-family="IBM Plex Sans, sans-serif">'+escapeHtml(nameShort)+'</text>';
     }).join('');
 

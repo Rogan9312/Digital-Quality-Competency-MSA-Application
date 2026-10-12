@@ -170,6 +170,49 @@ logiky appky sa vďaka tomu nemusel meniť):
       "Spôsobilosť" (ktorý zostáva založený na skóre správnosti).
       `computeOperatorStats()` pre toto počíta `detectionAvg` rovnako
       ako `avg` (súčet/počet).
+
+  **Dashboard: každý graf/tabuľka má vlastný prepínač "Úspešnosť" /
+  "Odhaliteľnosť vád".** Namiesto zdvojenia celého dashboardu (varianta,
+  ktorú si používateľ ponúkol ako alternatívu) má každý z 6 widgetov
+  samostatné tlačidlá `.metric-switch` (`data-widget="trend|pie|
+  highlights|bar|scatter|matrix"`, dve `<button data-metric="score|
+  detection">`), takže napr. Matica môže byť nastavená na odhaliteľnosť
+  vád a graf vývoja v čase pritom zostáva na úspešnosti — nezávisle.
+  - Stav: `dashMetricMode = {trend,pie,highlights,bar,scatter,matrix}`
+    (každý `'score'` alebo `'detection'`). Default pre všetky je
+    `'score'` OKREM `matrix`, ktorá má default `'detection'` (explicitná
+    požiadavka — matica sa má primárne pozerať na odhaliteľnosť vád).
+  - `metricValueOf(s, metric)` vráti `s.detectionAvg` alebo `s.avg`;
+    `metricLabel(metric)` vráti "Odhaliteľnosť vád"/"Úspešnosť" pre
+    titulky.
+  - Klik na tlačidlo prepínača len updatuje `dashMetricMode[widget]`
+    a prekreslí BEZ nového fetchu z Firestore — `renderOperatorComparison()`
+    (bar/scatter/pie/highlights/matrix) sa volá znova na vyrovnávacej
+    pamäti `lastComparisonAttempts` a `renderTrendChart()` (graf vývoja
+    v čase) na `lastTrendScoped`/`lastTrendOpVal` — oba sa nastavujú v
+    `renderDashboard()` pri každom reálnom načítaní dát (zmena filtra
+    Sekcia/Operátor/Od/Do).
+  - **Poradie "od najlepšieho po najhorší":** Porovnanie operátorov (bar
+    graf) aj Matica spôsobilosti sú VŽDY zoradené zostupne podľa
+    aktuálne zvolenej metriky tohto widgetu (`metricValueOf(b,metric)-
+    metricValueOf(a,metric)`) — nie podľa pevného poľa `avg`. `computeOperatorStats()`
+    už sám o sebe nezoraďuje zmysluplne pre viacero widgetov s rôznou
+    metrikou, takže každý widget si stats zoradí sám (`stats.slice().sort(...)`),
+    aby sa navzájom neovplyvňovali.
+  - V Matici majú stĺpce "Úspešnosť" a "Odhaliteľnosť vád" VLASTNÚ farbu
+    odznaku vždy podľa svojej vlastnej hodnoty (`tierFor(s.avg)` /
+    `tierFor(s.detectionAvg)`) bez ohľadu na prepínač — ten riadi len
+    poradie riadkov a stĺpce "Spôsobilosť"/"Odporúčanie" (tie sú podľa
+    `tierFor(metricValueOf(s, matrixMetric))`).
+  - `buildBarChartSvg(stats, metric)` a `buildScatterChartSvg(stats, metric)`
+    teraz berú metriku ako druhý parameter (default `'score'`) a vykresľujú
+    `metricValueOf(s, metric)` namiesto natvrdo `s.avg`; nadpisy
+    `#dash-bar-title`/`#dash-scatter-title` sa pri prekreslení aktualizujú
+    textom `metricLabel(metric)`.
+  - Graf vývoja v čase (`renderTrendChart`, vyextrahované z pôvodného
+    `renderDashboard()`) prepína pole `scorePercent`/`detectionScorePercent`
+    na jednotlivých pokusoch (resp. ich dennom priemere) a zodpovedajúco
+    upravuje aj titulok ("Vývoj úspešnosti..."/"Vývoj odhaliteľnosti vád...").
 - `operators` (doc id = `id`) — RFID/NFC karta → meno operátora:
   `{id, badgeId, name, createdAt}`. `badgeId` je jedinečný reťazec z karty
   (čítačka funguje ako klávesnica — "napíše" ho a odošle Enter). Spravuje
