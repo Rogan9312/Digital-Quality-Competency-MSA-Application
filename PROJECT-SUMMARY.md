@@ -52,11 +52,32 @@ logiky appky sa vďaka tomu nemusel meniť):
 - `attempts` (doc id = auto-generovaný Firestore ID, string) — jeden
   dokončený test jedného operátora: `{id, batchId, batchLabel,
   operatorName, startedAt, finishedAt, answers: [{photoId, name, given,
-  note, correctAtTime, isCorrect}], totalCount, correctCount, scorePercent,
-  archived}`. `batchLabel` a `correctAtTime` sú **snapshoty** v čase testu,
-  takže neskoršie premenovanie dávky alebo zmena správnej odpovede nekazí
-  historické reporty. `archived: true` = vylúčené zo všetkých
-  súhrnov/dashboardu (pozri nižšie).
+  note, correctAtTime, isCorrect, isExactMatch}], totalCount, correctCount,
+  scorePercent, archived}`. `batchLabel` a `correctAtTime` sú
+  **snapshoty** v čase testu, takže neskoršie premenovanie dávky alebo
+  zmena správnej odpovede nekazí historické reporty. `archived: true` =
+  vylúčené zo všetkých súhrnov/dashboardu (pozri nižšie).
+
+  **OK a Hranične OK sú pre vyhodnotenie rovnocenné.** V praxi majú
+  rovnaký dôsledok (diel sa uvoľní), takže `isCorrect` (používa sa pre
+  `correctCount`/`scorePercent`, aj pre všetky agregácie — dashboard,
+  štatistika podľa fotky) je `true` aj keď si operátor zamenil OK za
+  Hranične OK alebo naopak — `verdictAcceptGroup(v)` mapuje OK aj
+  Hranične OK na rovnakú skupinu `'RELEASE'`, NOK zostáva samostatne;
+  skutočná chyba je len zámena medzi skupinami. Samostatné pole
+  `isExactMatch` (`given===correctAtTime`) rozlišuje, či to bola presná
+  zhoda, alebo len "uznaná" zámena v rámci tej istej skupiny —
+  `verdictMarkState(a)` z toho odvodí tri vizuálne stavy: `hit` (zelená,
+  ✓), `near` (žltá/`--warn`, ≈ — "uznané", použitá farba je rovnaká ako
+  pri badge "Hranične OK"), `miss` (červená, ✕, skutočná chyba). Vidno
+  to vo výsledku operátora, v admin detaile pokusu aj v lightboxe;
+  tlačový fotogrid chybných fotiek (`buildPrintPhotoCard`) sa `near`
+  stavu netýka, keďže doň idú len `!isCorrect` položky.
+  **Dôležité:** toto platí len pre NOVÉ pokusy — staršie `attempts`
+  zapísané pred touto zmenou majú `isCorrect` dopočítané podľa starej
+  (prísnej, len presná zhoda) logiky a spätne sa neprepočítavajú, rovnako
+  ako `correctAtTime` nemení historické reporty pri zmene správnej
+  odpovede.
 - `operators` (doc id = `id`) — RFID/NFC karta → meno operátora:
   `{id, badgeId, name, createdAt}`. `badgeId` je jedinečný reťazec z karty
   (čítačka funguje ako klávesnica — "napíše" ho a odošle Enter). Spravuje

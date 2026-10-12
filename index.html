@@ -205,11 +205,13 @@
   .verdict-list li{display:flex;align-items:center;gap:12px;padding:9px 10px;border:1.5px solid var(--line);border-radius:var(--radius-s);margin-bottom:8px;}
   .verdict-list li:last-child{margin-bottom:0;}
   .verdict-list li.is-hit{border-color:var(--ok-line);background:var(--ok-bg);}
+  .verdict-list li.is-near{border-color:var(--warn-line);background:var(--warn-bg);}
   .verdict-list li.is-miss{border-color:var(--nok-line);background:var(--nok-bg);}
   .verdict-list img{width:38px;height:38px;object-fit:cover;border-radius:3px;border:1px solid var(--line);flex:none;}
   .verdict-list .vl-name{font-size:13px;color:var(--ink-soft);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .mark{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;color:#fff;}
   .mark.hit{background:var(--ok);}
+  .mark.near{background:var(--warn);}
   .mark.miss{background:var(--nok);}
 
   /* Fotky s výsledkami pre tlač — na obrazovke skryté, viditeľné len v @media print (pozri nižšie) */
@@ -327,6 +329,7 @@
   .lb-body img{max-width:100%;max-height:62vh;object-fit:contain;box-shadow:0 0 0 1px rgba(255,255,255,0.1);}
   .lb-meta{background:var(--panel);border-radius:var(--radius-m);padding:16px 20px;width:100%;max-width:520px;text-align:center;border:2.5px solid var(--line);}
   .lb-meta.is-hit{border-color:var(--ok-line);background:var(--ok-bg);}
+  .lb-meta.is-near{border-color:var(--warn-line);background:var(--warn-bg);}
   .lb-meta.is-miss{border-color:var(--nok-line);background:var(--nok-bg);}
   .lb-name{font-family:var(--font-mono);font-size:12px;color:var(--ink-soft);margin-bottom:10px;}
   .lb-badges{display:flex;gap:8px;justify-content:center;margin-bottom:8px;flex-wrap:wrap;}
@@ -1042,6 +1045,19 @@
   var VERDICT_LABEL = { OK:'OK', HRANICNE:'Hranične OK', NOK:'NOK' };
   var VERDICT_CLASS = { OK:'ok', HRANICNE:'warn', NOK:'nok' };
   var VERDICT_COLOR = { ok:'#1F7A54', warn:'#96650A', nok:'#AE2E22' };
+
+  /* OK a Hranične OK majú v praxi rovnaký dôsledok — diel sa uvoľní — takže
+     sa pre vyhodnotenie správnosti počítajú ako rovnaká skupina. Pomýliť si
+     NOK (zamietnutie) s ktorýmkoľvek z nich je jediná skutočná chyba. */
+  function verdictAcceptGroup(v){ return v==='NOK' ? 'NOK' : 'RELEASE'; }
+
+  /* Three-state visual for an answer: 'hit' (exact match, zelená),
+     'near' (iná skupina ako miss, ale isCorrect=true — OK vs. Hranične OK
+     zámena, žltá/amber), 'miss' (skutočná chyba, červená). */
+  function verdictMarkState(a){
+    if(!a.isCorrect) return 'miss';
+    return a.isExactMatch ? 'hit' : 'near';
+  }
 
   /* =========================================================
      FIRESTORE / STORAGE DATA LAYER
@@ -2361,7 +2377,9 @@
   function finishAttempt(){
     var answersArr = activePhotos.map(function(p){
       var a=currentAttempt.answers[p.id];
-      return { photoId:p.id, name:p.name, given:a.given, note:a.note||'', correctAtTime:p.correctAnswer, isCorrect:a.given===p.correctAnswer };
+      var isExactMatch = a.given===p.correctAnswer;
+      var isCorrect = isExactMatch || verdictAcceptGroup(a.given)===verdictAcceptGroup(p.correctAnswer);
+      return { photoId:p.id, name:p.name, given:a.given, note:a.note||'', correctAtTime:p.correctAnswer, isCorrect:isCorrect, isExactMatch:isExactMatch };
     });
     var correctCount = answersArr.filter(function(a){ return a.isCorrect; }).length;
     var record = {
@@ -2424,15 +2442,17 @@
     lightboxPhotos = activePhotos;
     record.answers.forEach(function(a, idx){
       var p = activePhotos.find(function(ph){ return ph.id===a.photoId; });
+      var state = verdictMarkState(a);
       var li=document.createElement('li');
-      li.className = a.isCorrect ? 'is-hit' : 'is-miss';
+      li.className = 'is-' + state;
       li.style.cursor = 'pointer';
       li.title = 'Kliknutím zobrazíte fotku na celú obrazovku';
       li.addEventListener('click', function(){ openLightbox(idx, true, 'Vaša odpoveď: '); });
       var img=document.createElement('img'); img.src=p?p.url:''; img.alt=a.name;
       var nameSpan=document.createElement('span'); nameSpan.className='vl-name';
-      nameSpan.textContent = (idx+1) + '. ' + a.name + ' — vaša odpoveď: ' + VERDICT_LABEL[a.given];
-      var mark=document.createElement('span'); mark.className='mark '+(a.isCorrect?'hit':'miss'); mark.textContent=a.isCorrect?'✓':'✕';
+      nameSpan.textContent = (idx+1) + '. ' + a.name + ' — vaša odpoveď: ' + VERDICT_LABEL[a.given] + (state==='near' ? ' (uznané)' : '');
+      var mark=document.createElement('span'); mark.className='mark '+state;
+      mark.textContent = state==='hit' ? '✓' : (state==='near' ? '≈' : '✕');
       li.appendChild(img); li.appendChild(nameSpan); li.appendChild(mark);
       resList.appendChild(li);
       if(!a.isCorrect) resPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
@@ -2663,7 +2683,7 @@
         td3.appendChild(b1); tr.appendChild(td3);
         var td4=document.createElement('td'); var b2=document.createElement('span'); b2.className='badge '+(a.correctAtTime?VERDICT_CLASS[a.correctAtTime]:'pending'); b2.textContent=a.correctAtTime?VERDICT_LABEL[a.correctAtTime]:'—';
         td4.appendChild(b2); tr.appendChild(td4);
-        var td5=document.createElement('td'); var mark=document.createElement('span'); mark.className='mark '+(a.isCorrect?'hit':'miss'); mark.style.display='inline-flex'; mark.textContent=a.isCorrect?'✓':'✕';
+        var td5=document.createElement('td'); var state=verdictMarkState(a); var mark=document.createElement('span'); mark.className='mark '+state; mark.style.display='inline-flex'; mark.textContent=state==='hit'?'✓':(state==='near'?'≈':'✕');
         td5.appendChild(mark); tr.appendChild(td5);
         var td6=document.createElement('td'); td6.textContent=a.note||'—'; tr.appendChild(td6);
         detailTbody.appendChild(tr);
@@ -2702,7 +2722,8 @@
     var p = lightboxPhotos.find(function(ph){ return ph.id===a.photoId; });
     lbImg.src = p ? p.url : '';
     lbImg.alt = a.name;
-    lbMeta.className = 'lb-meta ' + (a.isCorrect ? 'is-hit' : 'is-miss');
+    var lbState = verdictMarkState(a);
+    lbMeta.className = 'lb-meta is-' + lbState;
     lbName.textContent = (lightboxIndex+1) + ' / ' + lightboxAnswers.length + ' — ' + a.name;
 
     lbBadges.innerHTML = '';
@@ -2713,7 +2734,9 @@
       var correct = document.createElement('span'); correct.className='badge '+VERDICT_CLASS[a.correctAtTime]; correct.textContent='Správne: '+VERDICT_LABEL[a.correctAtTime];
       lbBadges.appendChild(correct);
     }
-    var mark = document.createElement('span'); mark.className='badge '+(a.isCorrect?'ok':'nok'); mark.textContent=a.isCorrect?'Zhoda ✓':'Nezhoda ✕';
+    var mark = document.createElement('span');
+    mark.className = 'badge ' + (lbState==='hit' ? 'ok' : (lbState==='near' ? 'warn' : 'nok'));
+    mark.textContent = lbState==='hit' ? 'Zhoda ✓' : (lbState==='near' ? 'Uznané ≈' : 'Nezhoda ✕');
     lbBadges.appendChild(mark);
 
     lbNote.textContent = a.note ? ('Poznámka: ' + a.note) : '';
