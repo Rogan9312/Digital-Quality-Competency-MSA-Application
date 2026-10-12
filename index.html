@@ -1054,11 +1054,36 @@
   function verdictAcceptGroup(v){ return v==='NOK' ? 'NOK' : 'RELEASE'; }
 
   /* Three-state visual for an answer: 'hit' (exact match, zelená),
-     'near' (iná skupina ako miss, ale isCorrect=true — OK vs. Hranične OK
-     zámena, žltá/amber), 'miss' (skutočná chyba, červená). */
+     'near' (iná skupina ako miss, ale rovnaká "RELEASE" skupina — OK vs.
+     Hranične OK zámena, žltá/amber), 'miss' (skutočná chyba, červená).
+     Počíta sa VŽDY naživo z given/correctAtTime (nikdy z uloženého
+     isCorrect/isExactMatch) — tie polia môžu byť na starších pokusoch
+     dopočítané podľa staršieho pravidla, kým sa manuálne neprepočítajú
+     (Administrácia → Reporty → "Prepočítať podľa pravidiel"), takže
+     spoliehať sa na ne pri zobrazovaní by vedelo ukázať nesprávny
+     stav aj po oprave pravidla — toto je odolné voči tomu úplne. */
   function verdictMarkState(a){
-    if(!a.isCorrect) return 'miss';
-    return a.isExactMatch ? 'hit' : 'near';
+    if(a.given===a.correctAtTime) return 'hit';
+    if(verdictAcceptGroup(a.given)===verdictAcceptGroup(a.correctAtTime)) return 'near';
+    return 'miss';
+  }
+  function isAnswerMiss(a){ return verdictMarkState(a)==='miss'; }
+
+  /* Live score from the answers themselves (given/correctAtTime), ignoring
+     whatever correctCount/scorePercent happen to be stored on the record —
+     keeps headers consistent with the always-live verdictMarkState() colors
+     even for attempts saved before a scoring-rule change, no migration
+     needed for this particular display. */
+  function computeLiveScore(answers){
+    var correctCount = answers.filter(function(a){ return !isAnswerMiss(a); }).length;
+    return { correctCount:correctCount, totalCount:answers.length, scorePercent: answers.length ? Math.round(correctCount/answers.length*100) : 0 };
+  }
+  function normalizeAttemptScore(rec){
+    if(!rec || !rec.answers) return rec;
+    var live = computeLiveScore(rec.answers);
+    rec.correctCount = live.correctCount;
+    rec.scorePercent = live.scorePercent;
+    return rec;
   }
 
   /* =========================================================
@@ -1108,7 +1133,14 @@
   }
   function idbGetAll(store){
     return firestore.collection(store).get().then(function(qs){
-      var out=[]; qs.forEach(function(d){ out.push(fsConvert(d.data())); }); return out;
+      var out=[]; qs.forEach(function(d){ out.push(fsConvert(d.data())); });
+      /* Normalize correctCount/scorePercent on every read, straight from the
+         stored answers — so every screen (Reporty, Dashboard, CSV, štatistika
+         podľa fotky, admin detail) always reflects the CURRENT scoring rule,
+         even for attempts saved under an older rule and never migrated. This
+         does not write anything back to Firestore; it's a read-time view. */
+      if(store==='attempts') out.forEach(normalizeAttemptScore);
+      return out;
     });
   }
   function idbDeleteKey(store, key){
@@ -2411,16 +2443,18 @@
      on paper you can't click a row to open the lightbox, so the photo and both
      verdicts need to be visible directly on the printed page. */
   function buildPrintPhotoCard(idx, a, p){
+    /* Only ever called for actual misses (callers guard with isAnswerMiss) —
+       correctly/near-answered photos don't get printed at all. */
     var card=document.createElement('div');
-    card.className = 'ppg-card ' + (a.isCorrect ? 'is-hit' : 'is-miss');
+    card.className = 'ppg-card is-miss';
     var img=document.createElement('img'); img.src=p?p.url:''; img.alt=a.name;
     var name=document.createElement('div'); name.className='ppg-name'; name.textContent=(idx+1)+'. '+a.name;
     var given=document.createElement('div'); given.className='ppg-line';
     given.textContent = 'Odpoveď: ' + VERDICT_LABEL[a.given];
     var correct=document.createElement('div'); correct.className='ppg-line';
     correct.textContent = 'Správne: ' + (a.correctAtTime ? VERDICT_LABEL[a.correctAtTime] : '—');
-    var mark=document.createElement('div'); mark.className='ppg-mark '+(a.isCorrect?'hit':'miss');
-    mark.textContent = a.isCorrect ? '✓ Zhoda' : '✕ Nezhoda';
+    var mark=document.createElement('div'); mark.className='ppg-mark miss';
+    mark.textContent = '✕ Nezhoda';
     card.appendChild(img); card.appendChild(name); card.appendChild(given); card.appendChild(correct); card.appendChild(mark);
     return card;
   }
@@ -2434,7 +2468,7 @@
 
     resList.innerHTML='';
     resPrintGrid.innerHTML='';
-    var resMissCount = record.answers.filter(function(a){ return !a.isCorrect; }).length;
+    var resMissCount = record.answers.filter(isAnswerMiss).length;
     if(resMissCount>0){
       var resPrintHeading=document.createElement('div'); resPrintHeading.className='ppg-heading';
       resPrintHeading.textContent = 'Fotky nesprávne vyhodnotených defektov (' + resMissCount + '):';
@@ -2457,7 +2491,7 @@
       mark.textContent = state==='hit' ? '✓' : (state==='near' ? '≈' : '✕');
       li.appendChild(img); li.appendChild(nameSpan); li.appendChild(mark);
       resList.appendChild(li);
-      if(!a.isCorrect) resPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
+      if(isAnswerMiss(a)) resPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
     });
   }
 
@@ -2591,7 +2625,7 @@
       var seen=0, correct=0;
       attempts.forEach(function(rec){
         var a=rec.answers.find(function(x){ return x.photoId===p.id; });
-        if(a){ seen++; if(a.isCorrect) correct++; }
+        if(a){ seen++; if(!isAnswerMiss(a)) correct++; }
       });
       var tr=document.createElement('tr');
       var td1=document.createElement('td'); var img=document.createElement('img'); img.className='rthumb'; img.src=p.url; img.alt=p.name;
@@ -2704,10 +2738,11 @@
   function openAttemptDetail(rec){
     currentDetailAttempt = rec;
     getPhotosForBatch(rec.batchId).then(function(photos){
+      var liveScore = computeLiveScore(rec.answers);
       detOpName.textContent = rec.operatorName;
-      detPct.textContent = rec.scorePercent+' %';
-      detPct.className = 'big-pct ' + scoreTier(rec.scorePercent);
-      detFrac.textContent = rec.correctCount+' / '+rec.totalCount+' správne';
+      detPct.textContent = liveScore.scorePercent+' %';
+      detPct.className = 'big-pct ' + scoreTier(liveScore.scorePercent);
+      detFrac.textContent = liveScore.correctCount+' / '+liveScore.totalCount+' správne';
       detWhen.textContent = new Date(rec.finishedAt).toLocaleString('sk-SK') + ' · ' + (rec.batchLabel||currentBatchLabel(rec.batchId));
 
       lightboxAnswers = rec.answers;
@@ -2715,7 +2750,7 @@
 
       detailTbody.innerHTML='';
       detailPrintGrid.innerHTML='';
-      var detMissCount = rec.answers.filter(function(a){ return !a.isCorrect; }).length;
+      var detMissCount = rec.answers.filter(isAnswerMiss).length;
       if(detMissCount>0){
         var detPrintHeading=document.createElement('div'); detPrintHeading.className='ppg-heading';
         detPrintHeading.textContent = 'Fotky nesprávne vyhodnotených defektov (' + detMissCount + '):';
@@ -2739,7 +2774,7 @@
         td5.appendChild(mark); tr.appendChild(td5);
         var td6=document.createElement('td'); td6.textContent=a.note||'—'; tr.appendChild(td6);
         detailTbody.appendChild(tr);
-        if(!a.isCorrect) detailPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
+        if(isAnswerMiss(a)) detailPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
       });
 
       showAdminPanel('detail');

@@ -73,22 +73,36 @@ logiky appky sa vďaka tomu nemusel meniť):
   to vo výsledku operátora, v admin detaile pokusu aj v lightboxe;
   tlačový fotogrid chybných fotiek (`buildPrintPhotoCard`) sa `near`
   stavu netýka, keďže doň idú len `!isCorrect` položky.
-  **Nové pokusy sa vyhodnocujú podľa tohto pravidla automaticky**
-  (`finishAttempt()`). Staršie `attempts` zapísané pred touto zmenou mali
-  pôvodne `isCorrect` dopočítané podľa starej (prísnej, len presná zhoda)
-  logiky — na žiadosť používateľa sa ale **jednorazovo retroaktívne
-  prepočítali** cez tlačidlo Administrácia → Reporty → "Prepočítať podľa
-  pravidiel (OK = Hranične OK)" (`btn-recalc-scoring`). Tlačidlo prejde
-  **všetky** `attempts` v Firestore (naprieč dávkami, vrátane
-  archivovaných), pre každú odpoveď prepočíta `isCorrect`/`isExactMatch`
-  z už uložených `given`/`correctAtTime` (netreba dohľadávať `photos` —
-  obe polia sú snapshoty priamo na odpovedi), dopočíta nové
-  `correctCount`/`scorePercent` a zapíše späť (sekvenčne, s priebežným
-  stavom v `#recalc-status`, podobne ako sekvenčný upload fotiek).
-  Nedotýka sa `given` ani iných pôvodných polí — mení sa len odvodené
-  vyhodnotenie. Je to opakovateľné/idempotentné (druhé spustenie nenájde
-  nič na zmenu), takže sa dá bezpečne spustiť znova, napr. po ďalšej
-  zmene pravidiel vyhodnocovania v budúcnosti.
+  **Vyhodnotenie sa počíta VŽDY naživo, nikdy sa neverí uloženému
+  `isCorrect`/`correctCount`/`scorePercent`.** Prvý pokus (ukladať tieto
+  polia pri zápise a spoliehať sa na ne pri čítaní) sa ukázal ako krehký —
+  staršie `attempts` mali tieto polia dopočítané podľa staršieho
+  (prísnejšieho) pravidla a bez migrácie zostali nekonzistentné so
+  zobrazením, ktoré už počítalo podľa nového pravidla (nahlásené ako bug:
+  presná zhoda NOK/NOK sa ukazovala ako "near" namiesto "hit", a
+  Hranične OK/OK zámena ako "miss" namiesto "near"). Oprava:
+  - `verdictMarkState(a)` (vizuálny stav pre jednu odpoveď) aj
+    `isAnswerMiss(a)` počítajú vždy priamo z `a.given`/`a.correctAtTime` —
+    nikdy z `a.isCorrect`/`a.isExactMatch`. Tieto staršie polia sa už pri
+    čítaní nepoužívajú vôbec (stále sa zapisujú vo `finishAttempt()` pri
+    vytvorení nového pokusu, ale sú redundantné/nepoužívané).
+  - `computeLiveScore(answers)` prepočíta `correctCount`/`totalCount`/
+    `scorePercent` pre celý pokus naživo z jeho `answers`.
+  - **Kľúčové miesto:** `idbGetAll('attempts')` (v dátovej vrstve) volá
+    `normalizeAttemptScore()` na KAŽDÝ načítaný záznam predtým, než ho
+    vráti volajúcemu — prepíše `correctCount`/`scorePercent` live
+    vypočítanou hodnotou. Keďže všetky miesta v appke (Reporty, Dashboard,
+    CSV export, Štatistika podľa fotky, admin detail pokusu) čítajú
+    pokusy výhradne cez `idbGetAll('attempts')`, stačí táto JEDNA úprava
+    a všade sa zobrazuje aktuálne správne vyhodnotenie — bez potreby
+    migrácie, okamžite, aj pre staré dáta. Nič sa pritom nezapisuje späť
+    do Firestore (čisto zobrazovacia normalizácia pri čítaní).
+  - Tlačidlo Administrácia → Reporty → "Prepočítať podľa pravidiel
+    (OK = Hranične OK)" (`btn-recalc-scoring`) preto už **nie je nutné**
+    pre správne zobrazenie — appka je teraz vždy správna aj bez neho.
+    Zostáva užitočné len na to, aby sa opravená hodnota aj skutočne
+    **zapísala** do Firestore (napr. pre niekoho, kto by dáta exportoval/
+    čítal mimo appky). Je idempotentné, dá sa spustiť kedykoľvek znova.
 - `operators` (doc id = `id`) — RFID/NFC karta → meno operátora:
   `{id, badgeId, name, createdAt}`. `badgeId` je jedinečný reťazec z karty
   (čítačka funguje ako klávesnica — "napíše" ho a odošle Enter). Spravuje
