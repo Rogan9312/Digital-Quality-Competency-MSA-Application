@@ -133,16 +133,25 @@ logiky appky sa vďaka tomu nemusel meniť):
   **Druhá, nezávislá % metrika — "odhaliteľnosť vád" — oddelená od
   skóre správnosti.** Skóre správnosti (`scorePercent`) zoskupuje
   OK a Hranične OK proti NOK (`verdictAcceptGroup`): zámena NOK↔Hranične
-  OK je tam `miss`. Odhaliteľnosť vád má ZÁMERNE INÉ zoskupenie —
-  `detectionGroup(v) = v==='OK' ? 'OK' : 'DEFECT'` — teda OK samotné
-  proti {Hranične OK, NOK} spolu. Dôvod: aj Hranične OK diel MÁ vadu,
-  takže keď operátor napíše NOK na diel, ktorý je v skutočnosti Hranične
-  OK, vadu reálne SPOZOROVAL (len ju prísnejšie zaradil) — pre
-  odhaliteľnosť je to teda zásah (`isDetectionMatch`=true), hoci pre
-  skóre správnosti je to `miss`/`near`. Naopak OK↔Hranične OK zámena
-  (operátor nevidel, že diel má vôbec nejakú vadu) JE tu skutočný miss,
-  aj keď pre skóre správnosti je to len `near` (žltá ≈).
-  - `detectionGroup(v)`, `isDetectionMatch(a)`,
+  OK je tam `miss`. Odhaliteľnosť vád NEPOUŽÍVA zoskupenie OK/non-OK,
+  ale poradie ZÁVAŽNOSTI: `defectSeverity(v)` = OK:0, Hranične OK:1,
+  NOK:2. Vada je "odhalená" (`isDetectionMatch`=true) práve vtedy, keď
+  `defectSeverity(a.given) >= defectSeverity(a.correctAtTime)` — teda
+  operátorova odpoveď je rovnako prísna alebo prísnejšia, než v
+  skutočnosti treba. Dôvod (vysvetlenie používateľa): diel oznacený ako
+  NOK sa u nich ide OPRAVIŤ a až potom ide k zákazníkovi — takže
+  "nadhodnotenie" vady je bezpečné a počíta sa ako odhalené:
+  - Skutočná Hranične OK oznacená ako NOK → **odhalená** (2>=1):
+    operátor to opravil/zastavil, aj keby bol prísnejší, než treba.
+  - Skutočná NOK oznacená ako Hranične OK ALEBO OK → **neodhalená**
+    (1<2 aj 0<2): reálny defekt unikol s nižšou závažnosťou, než má.
+  - Skutočná Hranične OK oznacená ako OK → **neodhalená** (0<1):
+    operátor si vadu nevšimol vôbec.
+  Toto sa môže LÍŠIŤ od hlavného skóre správnosti pre rovnakú odpoveď —
+  napr. Hranične OK oznacené ako NOK je pri správnosti `miss`
+  (`verdictAcceptGroup` ich dáva do rôznych skupín), ale pre
+  odhaliteľnosť je to `isDetectionMatch`=true (detekované).
+  - `defectSeverity(v)`, `isDetectionMatch(a)`,
     `computeDetectionScore(answers)` → `{matchCount, totalCount,
     detectionPercent}` — rovnaká štruktúra ako `computeLiveScore`.
   - `normalizeAttemptScore(rec)` dopočítava aj

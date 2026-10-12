@@ -1167,13 +1167,20 @@
 
   /* Druhá, nezávislá metrika — "odhaliteľnosť vád": nejde o presnosť
      vyhodnotenia (OK vs. Hranične OK vs. NOK), ale len o to, či operátor
-     VÔBEC spozoroval, že diel nie je úplne OK. Zoskupenie je tu zámerne
-     INÉ ako pri verdictAcceptGroup — Hranične OK sa tu počíta k "vada",
-     pretože aj Hranične OK diel má vadu, ktorá bola spozorovaná. Takže
-     NOK oznacené ako Hranične OK je tu "odhalené" (hit), hoci pri hlavnom
-     skóre správnosti je to "near"/"miss" podľa presnej zhody. */
-  function detectionGroup(v){ return v==='OK' ? 'OK' : 'DEFECT'; }
-  function isDetectionMatch(a){ return detectionGroup(a.given)===detectionGroup(a.correctAtTime); }
+     vadu zachytil AS PRÍSNE (alebo prísnejšie), ako v skutočnosti je —
+     teda podľa závažnosti, nie podľa jednoduchého zoskupenia OK/non-OK.
+     Závažnosť: OK=0, Hranične OK=1, NOK=2. Vada je "odhalená" práve
+     vtedy, keď operátorova odpoveď má ZÁVAŽNOSŤ >= skutočná závažnosť —
+     pretože u nás sa diel označený ako NOK ide opraviť a až potom ide k
+     zákazníkovi, takže "nadhodnotenie" vady (napr. Hranične OK oznacené
+     ako NOK) je bezpečné a počíta sa ako odhalené. Naopak PODHODNOTENIE
+     (operátor je menej prísny než skutočnosť — napr. skutočná NOK
+     oznacená ako Hranične OK alebo OK, alebo skutočná Hranične OK
+     oznacená ako OK) je neodhalená vada, aj keby pri hlavnom skóre
+     správnosti (verdictAcceptGroup, OK+Hranične OK proti NOK) to vyzeralo
+     inak. */
+  function defectSeverity(v){ return v==='NOK' ? 2 : (v==='HRANICNE' ? 1 : 0); }
+  function isDetectionMatch(a){ return defectSeverity(a.given) >= defectSeverity(a.correctAtTime); }
   function computeDetectionScore(answers){
     var matchCount = answers.filter(isDetectionMatch).length;
     return { matchCount:matchCount, totalCount:answers.length, detectionPercent: answers.length ? Math.round(matchCount/answers.length*100) : 0 };
