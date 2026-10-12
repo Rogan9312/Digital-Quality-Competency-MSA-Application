@@ -839,9 +839,11 @@
               <button class="btn btn-ghost btn-sm" id="btn-print-agg">Tlačiť súhrn</button>
               <button class="btn btn-ghost btn-sm" id="btn-archive-shown">Archivovať zobrazené</button>
               <button class="btn btn-ghost btn-sm" id="btn-restore-shown">Obnoviť z archívu</button>
+              <button class="btn btn-ghost btn-sm" id="btn-recalc-scoring">Prepočítať podľa pravidiel (OK = Hranične OK)</button>
               <button class="btn btn-danger btn-sm" id="btn-clear-attempts">Vymazať výsledky</button>
             </div>
             <p class="step-sub" style="margin:-6px 0 14px 0;">Archivované testy sa nezapočítavajú do súhrnov ani do Dashboardu, kým ich znova neobnovíte. Vhodné napr. na vlastné skúšobné testy pri príprave.</p>
+            <p class="step-sub" id="recalc-status" style="margin:-6px 0 14px 0;display:none;"></p>
 
             <div class="summary-row">
               <div class="summary-card navy"><div class="num" id="agg-count">0</div><div class="lbl">Počet testov</div></div>
@@ -2613,6 +2615,56 @@
     if(attemptsCache.length===0){ alert('Pre aktuálny filter nie sú žiadne výsledky.'); return; }
     if(!confirm('Obnoviť ' + attemptsCache.length + ' zobrazených výsledkov z archívu späť do bežných reportov?')) return;
     Promise.all(attemptsCache.map(function(a){ a.archived = false; return idbPut('attempts', a); })).then(renderReportsPanel);
+  });
+
+  document.getElementById('btn-recalc-scoring').addEventListener('click', function(){
+    if(!confirm('Prepočítať ÚPLNE VŠETKY uložené výsledky (vo všetkých dávkach, vrátane archivovaných) podľa aktuálneho pravidla vyhodnotenia — OK a Hranične OK sa teraz počítajú ako zhoda, skutočnou chybou je len zámena s NOK.\n\nPercentuálne výsledky operátorov sa môžu zmeniť (väčšinou zlepšiť). Pôvodné odpovede operátorov (čo naozaj zaklikli) sa nemenia, prepočíta sa len ich vyhodnotenie. Pokračovať?')) return;
+
+    var statusEl = document.getElementById('recalc-status');
+    statusEl.style.display = 'block';
+    statusEl.textContent = 'Načítavam výsledky…';
+
+    idbGetAll('attempts').then(function(all){
+      var toUpdate = [];
+      all.forEach(function(rec){
+        var changed = false;
+        rec.answers.forEach(function(a){
+          var isExactMatch = a.given===a.correctAtTime;
+          var isCorrect = isExactMatch || verdictAcceptGroup(a.given)===verdictAcceptGroup(a.correctAtTime);
+          if(a.isCorrect!==isCorrect || a.isExactMatch!==isExactMatch) changed = true;
+          a.isCorrect = isCorrect; a.isExactMatch = isExactMatch;
+        });
+        if(changed){
+          rec.correctCount = rec.answers.filter(function(a){ return a.isCorrect; }).length;
+          rec.scorePercent = Math.round(rec.correctCount/rec.answers.length*100);
+          toUpdate.push(rec);
+        }
+      });
+
+      if(toUpdate.length===0){
+        statusEl.style.display = 'none';
+        alert('Žiadne uložené výsledky nebolo treba prepočítať — všetky už zodpovedajú aktuálnemu pravidlu.');
+        return;
+      }
+
+      var i=0;
+      function next(){
+        if(i>=toUpdate.length){
+          statusEl.style.display = 'none';
+          alert('Hotovo. Prepočítaných výsledkov: ' + toUpdate.length + ' z ' + all.length + '.');
+          renderReportsPanel();
+          return;
+        }
+        statusEl.textContent = 'Prepočítavam výsledok ' + (i+1) + ' / ' + toUpdate.length + '…';
+        idbPut('attempts', toUpdate[i]).then(function(){ i++; next(); })
+          .catch(function(err){
+            statusEl.style.display = 'none';
+            alert('Chyba pri ukladaní (' + (err && err.message ? err.message : err) + '). Prepočítaných pred chybou: ' + i + ' / ' + toUpdate.length + '.');
+            renderReportsPanel();
+          });
+      }
+      next();
+    });
   });
 
   document.getElementById('btn-clear-attempts').addEventListener('click', function(){

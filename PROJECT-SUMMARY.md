@@ -73,11 +73,22 @@ logiky appky sa vďaka tomu nemusel meniť):
   to vo výsledku operátora, v admin detaile pokusu aj v lightboxe;
   tlačový fotogrid chybných fotiek (`buildPrintPhotoCard`) sa `near`
   stavu netýka, keďže doň idú len `!isCorrect` položky.
-  **Dôležité:** toto platí len pre NOVÉ pokusy — staršie `attempts`
-  zapísané pred touto zmenou majú `isCorrect` dopočítané podľa starej
-  (prísnej, len presná zhoda) logiky a spätne sa neprepočítavajú, rovnako
-  ako `correctAtTime` nemení historické reporty pri zmene správnej
-  odpovede.
+  **Nové pokusy sa vyhodnocujú podľa tohto pravidla automaticky**
+  (`finishAttempt()`). Staršie `attempts` zapísané pred touto zmenou mali
+  pôvodne `isCorrect` dopočítané podľa starej (prísnej, len presná zhoda)
+  logiky — na žiadosť používateľa sa ale **jednorazovo retroaktívne
+  prepočítali** cez tlačidlo Administrácia → Reporty → "Prepočítať podľa
+  pravidiel (OK = Hranične OK)" (`btn-recalc-scoring`). Tlačidlo prejde
+  **všetky** `attempts` v Firestore (naprieč dávkami, vrátane
+  archivovaných), pre každú odpoveď prepočíta `isCorrect`/`isExactMatch`
+  z už uložených `given`/`correctAtTime` (netreba dohľadávať `photos` —
+  obe polia sú snapshoty priamo na odpovedi), dopočíta nové
+  `correctCount`/`scorePercent` a zapíše späť (sekvenčne, s priebežným
+  stavom v `#recalc-status`, podobne ako sekvenčný upload fotiek).
+  Nedotýka sa `given` ani iných pôvodných polí — mení sa len odvodené
+  vyhodnotenie. Je to opakovateľné/idempotentné (druhé spustenie nenájde
+  nič na zmenu), takže sa dá bezpečne spustiť znova, napr. po ďalšej
+  zmene pravidiel vyhodnocovania v budúcnosti.
 - `operators` (doc id = `id`) — RFID/NFC karta → meno operátora:
   `{id, badgeId, name, createdAt}`. `badgeId` je jedinečný reťazec z karty
   (čítačka funguje ako klávesnica — "napíše" ho a odošle Enter). Spravuje
