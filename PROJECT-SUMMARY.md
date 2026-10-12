@@ -103,6 +103,32 @@ logiky appky sa vďaka tomu nemusel meniť):
     Zostáva užitočné len na to, aby sa opravená hodnota aj skutočne
     **zapísala** do Firestore (napr. pre niekoho, kto by dáta exportoval/
     čítal mimo appky). Je idempotentné, dá sa spustiť kedykoľvek znova.
+
+  **Rovnaké % skóre môže skrývať dva opačné druhy chyby — rozlíšené
+  smerom chyby, nie len percentom.** Medzi `miss` odpoveďami rozlišuje
+  `errorDirection(a)`:
+  - `'escape'` (NEBEZPEČNÁ) — skutočná vada (`correctAtTime==='NOK'`)
+    bola označená ako OK/Hranične OK, teda by prešla ku zákazníkovi.
+  - `'overreject'` (BEZPEČNÁ, len prísnejšia) — diel v poriadku
+    (OK/Hranične OK) bol označený ako NOK, teda by sa zbytočne zamietol.
+  `computeErrorBreakdown(answers)` spočíta oboje za celý pokus;
+  `computeOperatorStats()` ich sčítava aj naprieč pokusmi operátora.
+  Zobrazenie:
+  - Per-odpoveď: `verdictMarkSymbol(a)` dá `miss` odpovedi `⚠` namiesto
+    `✕`, ak ide o `escape` (admin detail, výsledok operátora, lightbox,
+    tlačový fotogrid — v tlači má `escape` karta aj hrubší okraj
+    `.ppg-card.is-escape`).
+  - Per-pokus: `renderErrorBreakdownBadges()` vykreslí dvojicu odznakov
+    ("⚠ Neodhalené vady: N" červeno, alebo "✓ Žiadna neodhalená vada"
+    zeleno, plus "Príliš prísne: N" žlto ak > 0) — na výsledku operátora
+    (`#res-error-breakdown`) aj v admin detaile pokusu
+    (`#det-error-breakdown`).
+  - V tabuľke Reportov má riadok pokusu pri skóre badge navyše malý
+    "⚠ N" odznak, ak má pokus aspoň jednu neodhalenú vadu.
+  - V Dashboarde "Matica spôsobilosti operátorov" má vlastný stĺpec
+    "⚠ Neodhalené vady" (súčet za všetky pokusy operátora vo filtri) —
+    presne na to, aby bolo pri rovnakom % hneď vidieť, ktorý operátor
+    reálne pustil vadu a ktorý bol len prísnejší.
 - `operators` (doc id = `id`) — RFID/NFC karta → meno operátora:
   `{id, badgeId, name, createdAt}`. `badgeId` je jedinečný reťazec z karty
   (čítačka funguje ako klávesnica — "napíše" ho a odošle Enter). Spravuje

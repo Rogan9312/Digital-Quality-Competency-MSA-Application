@@ -442,6 +442,7 @@
     }
     .print-photo-grid .ppg-card.is-hit{border-color:var(--ok-line);}
     .print-photo-grid .ppg-card.is-miss{border-color:var(--nok-line);}
+    .print-photo-grid .ppg-card.is-escape{border-width:3px;}
     .print-photo-grid img{width:100%;height:75mm;object-fit:contain;display:block;margin-bottom:6px;}
     .print-photo-grid .ppg-name{font-size:11px;font-weight:600;margin-bottom:4px;}
     .print-photo-grid .ppg-line{font-size:11px;color:var(--ink-soft);margin-bottom:2px;}
@@ -565,6 +566,7 @@
             <div class="big-pct" id="res-pct">0 %</div>
             <div class="frac" id="res-frac"></div>
             <div class="when" id="res-when"></div>
+            <div class="lb-badges" id="res-error-breakdown" style="justify-content:center;margin-top:10px;"></div>
           </div>
           <ul class="verdict-list" id="res-list"></ul>
           <div class="print-photo-grid" id="res-print-grid"></div>
@@ -949,7 +951,7 @@
               <p class="dash-card-sub">100–90 % = spôsobilý · 90–80 % = podmienečne spôsobilý · pod 80 % = nespôsobilý</p>
               <div class="scroll-box" style="height:200px;">
                 <table class="rtable" id="dash-matrix-table">
-                  <thead><tr><th>Operátor</th><th>Úspešnosť</th><th>Testov</th><th>Spôsobilosť</th><th>Odporúčanie</th></tr></thead>
+                  <thead><tr><th>Operátor</th><th>Úspešnosť</th><th>Testov</th><th>⚠ Neodhalené vady</th><th>Spôsobilosť</th><th>Odporúčanie</th></tr></thead>
                   <tbody id="dash-matrix-tbody"></tbody>
                 </table>
               </div>
@@ -978,6 +980,7 @@
               <div class="big-pct" id="det-pct">0 %</div>
               <div class="frac" id="det-frac"></div>
               <div class="when" id="det-when"></div>
+              <div class="lb-badges" id="det-error-breakdown" style="justify-content:center;margin-top:10px;"></div>
             </div>
             <table class="rtable">
               <thead><tr><th>#</th><th></th><th>Súbor</th><th>Odpoveď operátora</th><th>Správna odpoveď</th><th>Zhoda</th><th>Poznámka</th></tr></thead>
@@ -1084,6 +1087,60 @@
     rec.correctCount = live.correctCount;
     rec.scorePercent = live.scorePercent;
     return rec;
+  }
+
+  /* Rovnaké percento skóre môže skrývať dva veľmi odlišné druhy chyby:
+     - 'escape' (NEBEZPEČNÁ) — skutočná vada (NOK) bola označená ako OK
+       alebo Hranične OK, teda by prešla ku zákazníkovi.
+     - 'overreject' (BEZPEČNÁ, len prísnejšia) — diel v poriadku (OK/
+       Hranične OK) bol označený ako NOK, teda by sa zbytočne zamietol.
+     Len 'miss' odpovede majú smer; 'hit'/'near' nie sú chyba vôbec. */
+  function errorDirection(a){
+    if(!isAnswerMiss(a)) return null;
+    return a.correctAtTime==='NOK' ? 'escape' : 'overreject';
+  }
+  /* Symbol for a single answer's mark — within 'miss' distinguishes the
+     dangerous direction (⚠ escape — NOK released) from the safe one
+     (✕ overreject — good/borderline part scrapped), so it's visible per
+     photo, not just in the aggregate counts. */
+  function verdictMarkSymbol(a){
+    var state = verdictMarkState(a);
+    if(state==='hit') return '✓';
+    if(state==='near') return '≈';
+    return errorDirection(a)==='escape' ? '⚠' : '✕';
+  }
+  function computeErrorBreakdown(answers){
+    var escapes=0, overRejects=0;
+    answers.forEach(function(a){
+      var dir = errorDirection(a);
+      if(dir==='escape') escapes++;
+      else if(dir==='overreject') overRejects++;
+    });
+    return { escapes:escapes, overRejects:overRejects };
+  }
+  /* Shared badge row for an error breakdown — used on the operator's own
+     result screen and the admin attempt detail, so two people with the same
+     % score show at a glance which one actually let defects through. */
+  function renderErrorBreakdownBadges(container, breakdown){
+    if(!container) return;
+    container.innerHTML = '';
+    var escBadge = document.createElement('span');
+    if(breakdown.escapes>0){
+      escBadge.className = 'badge nok';
+      escBadge.textContent = '⚠ Neodhalené vady: ' + breakdown.escapes;
+      escBadge.title = 'NOK označené ako OK/Hranične OK — tieto diely by prešli ku zákazníkovi';
+    } else {
+      escBadge.className = 'badge ok';
+      escBadge.textContent = '✓ Žiadna neodhalená vada';
+    }
+    container.appendChild(escBadge);
+    if(breakdown.overRejects>0){
+      var orBadge = document.createElement('span');
+      orBadge.className = 'badge warn';
+      orBadge.textContent = 'Príliš prísne: ' + breakdown.overRejects;
+      orBadge.title = 'OK/Hranične OK označené ako NOK — zbytočne zamietnuté diely';
+      container.appendChild(orBadge);
+    }
   }
 
   /* =========================================================
@@ -2445,8 +2502,9 @@
   function buildPrintPhotoCard(idx, a, p){
     /* Only ever called for actual misses (callers guard with isAnswerMiss) —
        correctly/near-answered photos don't get printed at all. */
+    var isEscape = errorDirection(a)==='escape';
     var card=document.createElement('div');
-    card.className = 'ppg-card is-miss';
+    card.className = 'ppg-card is-miss' + (isEscape ? ' is-escape' : '');
     var img=document.createElement('img'); img.src=p?p.url:''; img.alt=a.name;
     var name=document.createElement('div'); name.className='ppg-name'; name.textContent=(idx+1)+'. '+a.name;
     var given=document.createElement('div'); given.className='ppg-line';
@@ -2454,7 +2512,7 @@
     var correct=document.createElement('div'); correct.className='ppg-line';
     correct.textContent = 'Správne: ' + (a.correctAtTime ? VERDICT_LABEL[a.correctAtTime] : '—');
     var mark=document.createElement('div'); mark.className='ppg-mark miss';
-    mark.textContent = '✕ Nezhoda';
+    mark.textContent = isEscape ? '⚠ Neodhalená vada' : '✕ Nezhoda (príliš prísne)';
     card.appendChild(img); card.appendChild(name); card.appendChild(given); card.appendChild(correct); card.appendChild(mark);
     return card;
   }
@@ -2465,6 +2523,7 @@
     resPct.className = 'big-pct ' + scoreTier(record.scorePercent);
     resFrac.textContent = record.correctCount + ' / ' + record.totalCount + ' správne';
     resWhen.textContent = new Date(record.finishedAt).toLocaleString('sk-SK');
+    renderErrorBreakdownBadges(document.getElementById('res-error-breakdown'), computeErrorBreakdown(record.answers));
 
     resList.innerHTML='';
     resPrintGrid.innerHTML='';
@@ -2488,7 +2547,8 @@
       var nameSpan=document.createElement('span'); nameSpan.className='vl-name';
       nameSpan.textContent = (idx+1) + '. ' + a.name + ' — vaša odpoveď: ' + VERDICT_LABEL[a.given] + (state==='near' ? ' (uznané)' : '');
       var mark=document.createElement('span'); mark.className='mark '+state;
-      mark.textContent = state==='hit' ? '✓' : (state==='near' ? '≈' : '✕');
+      mark.textContent = verdictMarkSymbol(a);
+      if(errorDirection(a)==='escape') mark.title = 'Neodhalená vada — toto bolo NOK';
       li.appendChild(img); li.appendChild(nameSpan); li.appendChild(mark);
       resList.appendChild(li);
       if(isAnswerMiss(a)) resPrintGrid.appendChild(buildPrintPhotoCard(idx, a, p));
@@ -2567,7 +2627,15 @@
           var td4=document.createElement('td'); td4.textContent=rec.correctCount+' / '+rec.totalCount; tr.appendChild(td4);
           var td5=document.createElement('td');
           var badge=document.createElement('span'); badge.className='badge '+(rec.scorePercent>=90?'ok':(rec.scorePercent>=70?'warn':'nok')); badge.textContent=rec.scorePercent+' %';
-          td5.appendChild(badge); tr.appendChild(td5);
+          td5.appendChild(badge);
+          var recErrors = computeErrorBreakdown(rec.answers);
+          if(recErrors.escapes>0){
+            var escBadge=document.createElement('span'); escBadge.className='badge nok'; escBadge.style.marginLeft='4px';
+            escBadge.textContent = '⚠ '+recErrors.escapes;
+            escBadge.title = 'Neodhalené vady (NOK označené ako OK/Hranične OK): ' + recErrors.escapes;
+            td5.appendChild(escBadge);
+          }
+          tr.appendChild(td5);
           var td6=document.createElement('td'); td6.textContent='Detail →'; td6.style.color='var(--ink-faint)'; td6.style.fontSize='12px'; tr.appendChild(td6);
           attemptsTbody.appendChild(tr);
         });
@@ -2744,6 +2812,7 @@
       detPct.className = 'big-pct ' + scoreTier(liveScore.scorePercent);
       detFrac.textContent = liveScore.correctCount+' / '+liveScore.totalCount+' správne';
       detWhen.textContent = new Date(rec.finishedAt).toLocaleString('sk-SK') + ' · ' + (rec.batchLabel||currentBatchLabel(rec.batchId));
+      renderErrorBreakdownBadges(document.getElementById('det-error-breakdown'), computeErrorBreakdown(rec.answers));
 
       lightboxAnswers = rec.answers;
       lightboxPhotos = photos;
@@ -2770,7 +2839,8 @@
         td3.appendChild(b1); tr.appendChild(td3);
         var td4=document.createElement('td'); var b2=document.createElement('span'); b2.className='badge '+(a.correctAtTime?VERDICT_CLASS[a.correctAtTime]:'pending'); b2.textContent=a.correctAtTime?VERDICT_LABEL[a.correctAtTime]:'—';
         td4.appendChild(b2); tr.appendChild(td4);
-        var td5=document.createElement('td'); var state=verdictMarkState(a); var mark=document.createElement('span'); mark.className='mark '+state; mark.style.display='inline-flex'; mark.textContent=state==='hit'?'✓':(state==='near'?'≈':'✕');
+        var td5=document.createElement('td'); var state=verdictMarkState(a); var mark=document.createElement('span'); mark.className='mark '+state; mark.style.display='inline-flex'; mark.textContent=verdictMarkSymbol(a);
+        if(errorDirection(a)==='escape') mark.title = 'Neodhalená vada — toto bolo NOK';
         td5.appendChild(mark); tr.appendChild(td5);
         var td6=document.createElement('td'); td6.textContent=a.note||'—'; tr.appendChild(td6);
         detailTbody.appendChild(tr);
@@ -2823,7 +2893,8 @@
     }
     var mark = document.createElement('span');
     mark.className = 'badge ' + (lbState==='hit' ? 'ok' : (lbState==='near' ? 'warn' : 'nok'));
-    mark.textContent = lbState==='hit' ? 'Zhoda ✓' : (lbState==='near' ? 'Uznané ≈' : 'Nezhoda ✕');
+    mark.textContent = lbState==='hit' ? 'Zhoda ✓' : (lbState==='near' ? 'Uznané ≈'
+      : (errorDirection(a)==='escape' ? 'Neodhalená vada ⚠' : 'Nezhoda ✕'));
     lbBadges.appendChild(mark);
 
     lbNote.textContent = a.note ? ('Poznámka: ' + a.note) : '';
@@ -2984,13 +3055,17 @@
   function computeOperatorStats(attempts){
     var byOp = {};
     attempts.forEach(function(a){
-      if(!byOp[a.operatorName]) byOp[a.operatorName] = { name:a.operatorName, count:0, sum:0 };
-      byOp[a.operatorName].count++;
-      byOp[a.operatorName].sum += a.scorePercent;
+      if(!byOp[a.operatorName]) byOp[a.operatorName] = { name:a.operatorName, count:0, sum:0, escapes:0, overRejects:0 };
+      var o = byOp[a.operatorName];
+      o.count++;
+      o.sum += a.scorePercent;
+      var eb = computeErrorBreakdown(a.answers);
+      o.escapes += eb.escapes;
+      o.overRejects += eb.overRejects;
     });
     return Object.keys(byOp).map(function(name){
       var o = byOp[name];
-      return { name:name, count:o.count, avg:Math.round(o.sum/o.count) };
+      return { name:name, count:o.count, avg:Math.round(o.sum/o.count), escapes:o.escapes, overRejects:o.overRejects };
     }).sort(function(a,b){ return a.avg-b.avg; }); // worst first
   }
   // Capability thresholds: 100–90% spôsobilý, 90–80% podmienečne spôsobilý, pod 80% nespôsobilý
@@ -3070,6 +3145,9 @@
       var td1=document.createElement('td'); td1.textContent=s.name; tr.appendChild(td1);
       var td2=document.createElement('td'); var b=document.createElement('span'); b.className='badge '+tier; b.textContent=s.avg+' %'; td2.appendChild(b); tr.appendChild(td2);
       var td3=document.createElement('td'); td3.textContent=s.count; tr.appendChild(td3);
+      var tdEsc=document.createElement('td');
+      var escBadge=document.createElement('span'); escBadge.className='badge '+(s.escapes>0?'nok':'ok'); escBadge.textContent=s.escapes>0?('⚠ '+s.escapes):'0';
+      tdEsc.appendChild(escBadge); tr.appendChild(tdEsc);
       var td4=document.createElement('td'); var b2=document.createElement('span'); b2.className='badge '+tier; b2.textContent=tierLabel(tier); td4.appendChild(b2); tr.appendChild(td4);
       var td5=document.createElement('td'); td5.textContent=recommendationFor(tier, s.count, medianCount); tr.appendChild(td5);
       matrixTbody.appendChild(tr);
