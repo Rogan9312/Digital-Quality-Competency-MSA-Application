@@ -129,6 +129,47 @@ logiky appky sa vďaka tomu nemusel meniť):
     "⚠ Neodhalené vady" (súčet za všetky pokusy operátora vo filtri) —
     presne na to, aby bolo pri rovnakom % hneď vidieť, ktorý operátor
     reálne pustil vadu a ktorý bol len prísnejší.
+
+  **Druhá, nezávislá % metrika — "odhaliteľnosť vád" — oddelená od
+  skóre správnosti.** Skóre správnosti (`scorePercent`) zoskupuje
+  OK a Hranične OK proti NOK (`verdictAcceptGroup`): zámena NOK↔Hranične
+  OK je tam `miss`. Odhaliteľnosť vád má ZÁMERNE INÉ zoskupenie —
+  `detectionGroup(v) = v==='OK' ? 'OK' : 'DEFECT'` — teda OK samotné
+  proti {Hranične OK, NOK} spolu. Dôvod: aj Hranične OK diel MÁ vadu,
+  takže keď operátor napíše NOK na diel, ktorý je v skutočnosti Hranične
+  OK, vadu reálne SPOZOROVAL (len ju prísnejšie zaradil) — pre
+  odhaliteľnosť je to teda zásah (`isDetectionMatch`=true), hoci pre
+  skóre správnosti je to `miss`/`near`. Naopak OK↔Hranične OK zámena
+  (operátor nevidel, že diel má vôbec nejakú vadu) JE tu skutočný miss,
+  aj keď pre skóre správnosti je to len `near` (žltá ≈).
+  - `detectionGroup(v)`, `isDetectionMatch(a)`,
+    `computeDetectionScore(answers)` → `{matchCount, totalCount,
+    detectionPercent}` — rovnaká štruktúra ako `computeLiveScore`.
+  - `normalizeAttemptScore(rec)` dopočítava aj
+    `rec.detectionMatchCount`/`rec.detectionScorePercent` — rovnakým
+    mechanizmom a na rovnakom mieste (`idbGetAll('attempts')`) ako
+    `scorePercent`, takže je to tiež vždy živé a bez migrácie.
+    `finishAttempt()` ukladá tieto polia aj priamo pri vytvorení pokusu
+    (pre dátovú úplnosť, hoci displej sa aj tak spolieha na živý
+    prepočet).
+  - Percentuálna klasifikácia odhaliteľnosti používa **rovnaké prahy**
+    ako spôsobilosť podľa skóre správnosti — `tierFor`/`tierLabel`
+    (100–90 % spôsobilý, 90–80 % podmienečne, pod 80 % nespôsobilý) —
+    presne podľa požiadavky, aby sa oba ukazovatele hodnotili rovnako.
+  - Zobrazenie (zdieľaný `renderDetectionScoreBadge(container,
+    answers)` tam, kde treba len jeden odznak s %):
+    - Výsledok operátora (`#res-detection-score`) a admin detail pokusu
+      (`#det-detection-score`) — odznak hneď pod "⚠ Neodhalené vady".
+    - Tabuľka Reportov (`#attempts-tbody`) — nový stĺpec "Odhaliteľnosť
+      vád" vedľa stĺpca "Úspešnosť", oba ako samostatné % odznaky s
+      farbou podľa `tierFor`.
+    - CSV export súhrnu výsledkov — nový stĺpec "Odhaliteľnosť vád (%)".
+    - Dashboard "Matica spôsobilosti operátorov" — nový stĺpec
+      "Odhaliteľnosť vád" (priemer `detectionScorePercent` za pokusy
+      operátora, farba podľa `tierFor`) vedľa existujúceho stĺpca
+      "Spôsobilosť" (ktorý zostáva založený na skóre správnosti).
+      `computeOperatorStats()` pre toto počíta `detectionAvg` rovnako
+      ako `avg` (súčet/počet).
 - `operators` (doc id = `id`) — RFID/NFC karta → meno operátora:
   `{id, badgeId, name, createdAt}`. `badgeId` je jedinečný reťazec z karty
   (čítačka funguje ako klávesnica — "napíše" ho a odošle Enter). Spravuje

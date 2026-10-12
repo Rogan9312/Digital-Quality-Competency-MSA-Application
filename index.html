@@ -567,6 +567,7 @@
             <div class="frac" id="res-frac"></div>
             <div class="when" id="res-when"></div>
             <div class="lb-badges" id="res-error-breakdown" style="justify-content:center;margin-top:10px;"></div>
+            <div class="lb-badges" id="res-detection-score" style="justify-content:center;margin-top:6px;"></div>
           </div>
           <ul class="verdict-list" id="res-list"></ul>
           <div class="print-photo-grid" id="res-print-grid"></div>
@@ -855,7 +856,7 @@
             </div>
 
             <table class="rtable">
-              <thead><tr><th>Operátor</th><th>Dávka</th><th>Dátum</th><th>Skóre</th><th>Úspešnosť</th><th></th></tr></thead>
+              <thead><tr><th>Operátor</th><th>Dávka</th><th>Dátum</th><th>Skóre</th><th>Úspešnosť</th><th>Odhaliteľnosť vád</th><th></th></tr></thead>
               <tbody id="attempts-tbody"></tbody>
             </table>
 
@@ -951,7 +952,7 @@
               <p class="dash-card-sub">100–90 % = spôsobilý · 90–80 % = podmienečne spôsobilý · pod 80 % = nespôsobilý</p>
               <div class="scroll-box" style="height:200px;">
                 <table class="rtable" id="dash-matrix-table">
-                  <thead><tr><th>Operátor</th><th>Úspešnosť</th><th>Testov</th><th>⚠ Neodhalené vady</th><th>Spôsobilosť</th><th>Odporúčanie</th></tr></thead>
+                  <thead><tr><th>Operátor</th><th>Úspešnosť</th><th>Testov</th><th>⚠ Neodhalené vady</th><th>Spôsobilosť</th><th>Odhaliteľnosť vád</th><th>Odporúčanie</th></tr></thead>
                   <tbody id="dash-matrix-tbody"></tbody>
                 </table>
               </div>
@@ -981,6 +982,7 @@
               <div class="frac" id="det-frac"></div>
               <div class="when" id="det-when"></div>
               <div class="lb-badges" id="det-error-breakdown" style="justify-content:center;margin-top:10px;"></div>
+              <div class="lb-badges" id="det-detection-score" style="justify-content:center;margin-top:6px;"></div>
             </div>
             <table class="rtable">
               <thead><tr><th>#</th><th></th><th>Súbor</th><th>Odpoveď operátora</th><th>Správna odpoveď</th><th>Zhoda</th><th>Poznámka</th></tr></thead>
@@ -1086,6 +1088,9 @@
     var live = computeLiveScore(rec.answers);
     rec.correctCount = live.correctCount;
     rec.scorePercent = live.scorePercent;
+    var detection = computeDetectionScore(rec.answers);
+    rec.detectionMatchCount = detection.matchCount;
+    rec.detectionScorePercent = detection.detectionPercent;
     return rec;
   }
 
@@ -1118,6 +1123,21 @@
     });
     return { escapes:escapes, overRejects:overRejects };
   }
+
+  /* Druhá, nezávislá metrika — "odhaliteľnosť vád": nejde o presnosť
+     vyhodnotenia (OK vs. Hranične OK vs. NOK), ale len o to, či operátor
+     VÔBEC spozoroval, že diel nie je úplne OK. Zoskupenie je tu zámerne
+     INÉ ako pri verdictAcceptGroup — Hranične OK sa tu počíta k "vada",
+     pretože aj Hranične OK diel má vadu, ktorá bola spozorovaná. Takže
+     NOK oznacené ako Hranične OK je tu "odhalené" (hit), hoci pri hlavnom
+     skóre správnosti je to "near"/"miss" podľa presnej zhody. */
+  function detectionGroup(v){ return v==='OK' ? 'OK' : 'DEFECT'; }
+  function isDetectionMatch(a){ return detectionGroup(a.given)===detectionGroup(a.correctAtTime); }
+  function computeDetectionScore(answers){
+    var matchCount = answers.filter(isDetectionMatch).length;
+    return { matchCount:matchCount, totalCount:answers.length, detectionPercent: answers.length ? Math.round(matchCount/answers.length*100) : 0 };
+  }
+
   /* Shared badge row for an error breakdown — used on the operator's own
      result screen and the admin attempt detail, so two people with the same
      % score show at a glance which one actually let defects through. */
@@ -1141,6 +1161,19 @@
       orBadge.title = 'OK/Hranične OK označené ako NOK — zbytočne zamietnuté diely';
       container.appendChild(orBadge);
     }
+  }
+  /* Single badge for the "odhaliteľnosť vád" % — same tierFor/tierLabel
+     tier coloring as the capability matrix, reused wherever a result is
+     shown (operator result screen, admin detail, reports table). */
+  function renderDetectionScoreBadge(container, answers){
+    if(!container) return;
+    container.innerHTML = '';
+    var detection = computeDetectionScore(answers);
+    var badge = document.createElement('span');
+    badge.className = 'badge ' + tierFor(detection.detectionPercent);
+    badge.textContent = 'Odhaliteľnosť vád: ' + detection.detectionPercent + ' %';
+    badge.title = 'Aj Hranične OK sa tu počíta ako spozorovaná vada (na rozdiel od skóre správnosti)';
+    container.appendChild(badge);
   }
 
   /* =========================================================
@@ -2473,11 +2506,14 @@
       return { photoId:p.id, name:p.name, given:a.given, note:a.note||'', correctAtTime:p.correctAnswer, isCorrect:isCorrect, isExactMatch:isExactMatch };
     });
     var correctCount = answersArr.filter(function(a){ return a.isCorrect; }).length;
+    var detection = computeDetectionScore(answersArr);
     var record = {
       batchId: currentAttempt.batchId, batchLabel: currentAttempt.batchLabel,
       operatorName: currentAttempt.operatorName, startedAt: currentAttempt.startedAt, finishedAt: new Date(),
       answers: answersArr, totalCount: answersArr.length, correctCount: correctCount,
-      scorePercent: Math.round(correctCount/answersArr.length*100), archived: false
+      scorePercent: Math.round(correctCount/answersArr.length*100),
+      detectionMatchCount: detection.matchCount, detectionScorePercent: detection.detectionPercent,
+      archived: false
     };
     idbPut('attempts', record).then(function(id){
       record.id = id;
@@ -2524,6 +2560,7 @@
     resFrac.textContent = record.correctCount + ' / ' + record.totalCount + ' správne';
     resWhen.textContent = new Date(record.finishedAt).toLocaleString('sk-SK');
     renderErrorBreakdownBadges(document.getElementById('res-error-breakdown'), computeErrorBreakdown(record.answers));
+    renderDetectionScoreBadge(document.getElementById('res-detection-score'), record.answers);
 
     resList.innerHTML='';
     resPrintGrid.innerHTML='';
@@ -2612,7 +2649,7 @@
 
       attemptsTbody.innerHTML='';
       if(attempts.length===0){
-        var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=6; td.className='empty-state';
+        var tr=document.createElement('tr'); var td=document.createElement('td'); td.colSpan=7; td.className='empty-state';
         td.textContent='Zatiaľ žiadne dokončené testy.'; tr.appendChild(td); attemptsTbody.appendChild(tr);
       } else {
         attempts.forEach(function(rec){
@@ -2636,6 +2673,10 @@
             td5.appendChild(escBadge);
           }
           tr.appendChild(td5);
+          var td5b=document.createElement('td');
+          var detBadge=document.createElement('span'); detBadge.className='badge '+tierFor(rec.detectionScorePercent); detBadge.textContent=rec.detectionScorePercent+' %';
+          detBadge.title='Odhaliteľnosť vád: aj Hranične OK sa tu počíta ako spozorovaná vada (na rozdiel od skóre správnosti)';
+          td5b.appendChild(detBadge); tr.appendChild(td5b);
           var td6=document.createElement('td'); td6.textContent='Detail →'; td6.style.color='var(--ink-faint)'; td6.style.fontSize='12px'; tr.appendChild(td6);
           attemptsTbody.appendChild(tr);
         });
@@ -2789,9 +2830,9 @@
 
   document.getElementById('btn-export-agg-csv').addEventListener('click', function(){
     var lines=[];
-    lines.push(['Operátor','Dávka','Dátum','Správne','Celkom','Úspešnosť (%)'].map(csvEsc).join(';'));
+    lines.push(['Operátor','Dávka','Dátum','Správne','Celkom','Úspešnosť (%)','Odhaliteľnosť vád (%)'].map(csvEsc).join(';'));
     attemptsCache.forEach(function(rec){
-      lines.push([rec.operatorName, rec.batchLabel||currentBatchLabel(rec.batchId), new Date(rec.finishedAt).toLocaleString('sk-SK'), rec.correctCount, rec.totalCount, rec.scorePercent].map(csvEsc).join(';'));
+      lines.push([rec.operatorName, rec.batchLabel||currentBatchLabel(rec.batchId), new Date(rec.finishedAt).toLocaleString('sk-SK'), rec.correctCount, rec.totalCount, rec.scorePercent, rec.detectionScorePercent].map(csvEsc).join(';'));
     });
     downloadCsv(lines, 'suhrn-vysledkov');
   });
@@ -2813,6 +2854,7 @@
       detFrac.textContent = liveScore.correctCount+' / '+liveScore.totalCount+' správne';
       detWhen.textContent = new Date(rec.finishedAt).toLocaleString('sk-SK') + ' · ' + (rec.batchLabel||currentBatchLabel(rec.batchId));
       renderErrorBreakdownBadges(document.getElementById('det-error-breakdown'), computeErrorBreakdown(rec.answers));
+      renderDetectionScoreBadge(document.getElementById('det-detection-score'), rec.answers);
 
       lightboxAnswers = rec.answers;
       lightboxPhotos = photos;
@@ -3055,17 +3097,18 @@
   function computeOperatorStats(attempts){
     var byOp = {};
     attempts.forEach(function(a){
-      if(!byOp[a.operatorName]) byOp[a.operatorName] = { name:a.operatorName, count:0, sum:0, escapes:0, overRejects:0 };
+      if(!byOp[a.operatorName]) byOp[a.operatorName] = { name:a.operatorName, count:0, sum:0, detectionSum:0, escapes:0, overRejects:0 };
       var o = byOp[a.operatorName];
       o.count++;
       o.sum += a.scorePercent;
+      o.detectionSum += computeDetectionScore(a.answers).detectionPercent;
       var eb = computeErrorBreakdown(a.answers);
       o.escapes += eb.escapes;
       o.overRejects += eb.overRejects;
     });
     return Object.keys(byOp).map(function(name){
       var o = byOp[name];
-      return { name:name, count:o.count, avg:Math.round(o.sum/o.count), escapes:o.escapes, overRejects:o.overRejects };
+      return { name:name, count:o.count, avg:Math.round(o.sum/o.count), detectionAvg:Math.round(o.detectionSum/o.count), escapes:o.escapes, overRejects:o.overRejects };
     }).sort(function(a,b){ return a.avg-b.avg; }); // worst first
   }
   // Capability thresholds: 100–90% spôsobilý, 90–80% podmienečne spôsobilý, pod 80% nespôsobilý
@@ -3149,6 +3192,11 @@
       var escBadge=document.createElement('span'); escBadge.className='badge '+(s.escapes>0?'nok':'ok'); escBadge.textContent=s.escapes>0?('⚠ '+s.escapes):'0';
       tdEsc.appendChild(escBadge); tr.appendChild(tdEsc);
       var td4=document.createElement('td'); var b2=document.createElement('span'); b2.className='badge '+tier; b2.textContent=tierLabel(tier); td4.appendChild(b2); tr.appendChild(td4);
+      var tdDet=document.createElement('td');
+      var detTier=tierFor(s.detectionAvg);
+      var detBadge=document.createElement('span'); detBadge.className='badge '+detTier; detBadge.textContent=s.detectionAvg+' %';
+      detBadge.title='Odhaliteľnosť vád: aj Hranične OK sa tu počíta ako spozorovaná vada';
+      tdDet.appendChild(detBadge); tr.appendChild(tdDet);
       var td5=document.createElement('td'); td5.textContent=recommendationFor(tier, s.count, medianCount); tr.appendChild(td5);
       matrixTbody.appendChild(tr);
     });
