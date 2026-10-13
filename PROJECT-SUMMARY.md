@@ -469,6 +469,19 @@ Päť podzáložiek:
    - Bodový graf "Počet testov × úspešnosť" — rovnaké pásma, ALE horná
      (90–100 %) zóna je rozdelená zvislou čiarou na "oranžovú" (menej ako 3
      testy = zatiaľ nepotvrdené) a "zelenú" (3+ testov = potvrdené) časť.
+     **Os Y je nelineárna (zámerne, na žiadosť používateľa):** reálne skóre
+     sa prakticky vždy pohybuje v pásme 80–100 %, takže čisto lineárna
+     škála 0–100 % stláčala väčšinu bodiek operátorov do úzkeho prúžku pri
+     vrchu a mená sa prekrývali. `yFor(v)` v `buildScatterChartSvg` je
+     preto po úsekoch lineárna (piecewise) — pásmo 0–80 % dostane len
+     `FRAC_LOW=0.20` výšky grafu, 80–90 % dostane `FRAC_MID=0.35` a
+     90–100 % dostane `FRAC_HIGH=0.45` (súčet=1, zdola nahor), takže horné
+     dve pásma (kde reálne operátori sú) zaberajú 80 % výšky grafu aj keď
+     pokrývajú len 20 percentuálnych bodov hodnoty. Celý rozsah 0–100 %
+     zostáva zobrazený (nič sa neoreže), len nelineárne komprimovaný dolu.
+     Keďže pozadie pásiem (`zones`) aj mriežka (`gridY`) používajú rovnakú
+     `yFor()`, prispôsobia sa automaticky bez ďalších zmien. Výška SVG
+     (`H`) sa zároveň zvýšila z 340 na 420, aby bolo celkovo viac miesta.
    - "Matica spôsobilosti operátorov" — tabuľka so stĺpcom Odporúčanie
      (kombinuje tier + dostatok dát).
    - **Spôsobilostné prahy (fixné, používateľom explicitne zadané):**

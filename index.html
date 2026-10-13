@@ -3605,14 +3605,27 @@
 
   function buildScatterChartSvg(stats, metric){
     metric = metric || 'score';
-    var W=520, H=340, padL=46, padR=20, padT=16, padB=40;
+    var W=520, H=420, padL=46, padR=20, padT=16, padB=40;
     var innerW=W-padL-padR, innerH=H-padT-padB;
     var maxCount = Math.max.apply(null, stats.map(function(s){ return s.count; }));
     var xMax = Math.max(maxCount, 4);
     var CONFIDENT_TESTS = 3; // below this, even a high score is shown as "not yet confirmed"
 
     function xFor(c){ return padL + (c/xMax)*innerW; }
-    function yFor(v){ return padT + innerH - (Math.max(0,Math.min(100,v))/100)*innerH; }
+    /* Nelineárna os Y — skutočné výsledky sa takmer vždy pohybujú v pásme
+       80–100 %, takže lineárna škála 0–100 % tam stláča väčšinu bodiek do
+       úzkeho prúžku. Namiesto toho má pásmo 0–80 % (kam sa reálne skóre
+       skoro nikdy nedostane) len malý zlomok výšky grafu a pásma 80–90 %
+       a 90–100 % dostanú zvyšok — bodky operátorov sa tak dajú čítať bez
+       prekrývania mien, aj keď celý rozsah 0–100 % zostáva zobrazený. */
+    var FRAC_LOW = 0.20, FRAC_MID = 0.35, FRAC_HIGH = 0.45; // súčet = 1 (zdola nahor: 0–80 %, 80–90 %, 90–100 %)
+    function yFor(v){
+      v = Math.max(0, Math.min(100, v));
+      var bottom = padT + innerH;
+      if(v<=80) return bottom - (v/80)*(FRAC_LOW*innerH);
+      if(v<=90) return bottom - FRAC_LOW*innerH - ((v-80)/10)*(FRAC_MID*innerH);
+      return bottom - FRAC_LOW*innerH - FRAC_MID*innerH - ((v-90)/10)*(FRAC_HIGH*innerH);
+    }
 
     var xThr = Math.min(W-padR, xFor(CONFIDENT_TESTS));
     var zones =
