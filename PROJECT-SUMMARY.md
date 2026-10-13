@@ -240,12 +240,6 @@ logiky appky sa vďaka tomu nemusel meniť):
     `{key, names}`) — načíta sa v `init()`. `isOperatorHidden(name)` /
     `setOperatorHidden(name, hidden)` (ten druhý zapíše do `kv` a hneď
     prekresli `renderReportsPanel()` aj `renderDashboard()`).
-  - UI: Administrácia → Operátori → nový blok "Skryté mená v reportoch a
-    dashboarde" (`#hidden-operators-tbody`) — tabuľka VŠETKÝCH mien, ktoré
-    sa niekedy objavili v `attempts` (union registrovaných operátorov a
-    manuálne napísaných mien, cez `buildOperatorRoster(attempts)` — rovnaká
-    funkcia ako pri rostri Quality Alert "kto videl"), každé s klikateľným
-    `.badge-toggle` odznakom "Viditeľný"/"Skrytý".
   - Filter sa aplikuje v `renderReportsPanel()` (hneď po `idbGetAll('attempts')`,
     pred archívnym/dátumovým filtrom — takže aj súhrny, CSV export a
     "Prehľad podľa dávok" sú bez skrytých mien) a v Dashboarde v
@@ -255,6 +249,35 @@ logiky appky sa vďaka tomu nemusel meniť):
     Quality Alert "kto videl" roster/matica (`qaOperatorRoster`) sa
     ZÁMERNE nefiltruje — skrývanie je len pre výkonnostné reporty, nie pre
     sledovanie, kto si prečítal upozornenie.
+
+  **Premenovanie/zlúčenie operátora (oprava preklepu v mene).** Keďže
+  meno sa píše ručne (alebo je z karty, ale aj to sa dá preklepnúť pri
+  registrácii), rovnaký človek sa môže v `attempts.operatorName` objaviť
+  pod viacerými variantmi (napr. "solomia kotsilym" vs. "Solomia
+  Kotsiulym") a appka ich počíta ako DVOCH rôznych operátorov, lebo všade
+  sa zoskupuje presne podľa tohto reťazca. `renameOperatorEverywhere(oldName,
+  newName)` prepíše `operatorName`/`name` vo VŠETKÝCH miestach, kde sa meno
+  ako reťazec ukladá — nie je to cudzí kľúč, takže treba prejsť každú
+  kolekciu zvlášť:
+  - `attempts.operatorName` na každom zázname s `oldName` (samotné
+    výsledky testov — toto je to hlavné, čo spôsobuje "zlúčenie").
+  - `operators.name`, ak je `oldName` naviazané na RFID/NFC kartu (aby
+    ďalšie testy cez tú kartu používali už opravené meno, a nevznikol
+    duplicitný variant znova).
+  - `qualityAlertAcks.operatorName` (aby sa zlúčila aj história "kto videl
+    upozornenie", nielen výkonnostné výsledky).
+  - `hiddenOperatorNames`, ak bolo `oldName` skryté — prenesie sa
+    skrytie na `newName` (pokiaľ tam už nie je).
+  Keďže Reporty aj Dashboard zoskupujú operátorov striktne podľa tohto
+  reťazca, zhoda `newName` s iným už existujúcim menom ich automaticky
+  spojí do jedného operátora — žiadny ďalší krok netreba. UI: Administrácia
+  → Operátori → "Správa mien operátorov v reportoch a dashboarde"
+  (rozšírenie pôvodného bloku so skrývaním, teraz má aj stĺpec "Testov" a
+  tlačidlo "✎ Premenovať" na riadok) — `promptRenameOperator()` cez
+  `prompt()` (rovnaký vzor ako premenovanie Sekcie/Dávky inde v appke)
+  vypýta nové meno, ak sa zhoduje s iným existujúcim menom v rostri, pred
+  vykonaním to vypíše do `confirm()` dialógu výslovne ako "spojenie", aby
+  administrátor vedel, čo sa stane.
 - `qualityAlerts` (doc id = `id`) — upozornenia viazané na Sekciu:
   `{id, areaId, title, description, imageData, dateFrom, durationDays,
   isActive, createdAt}`. `areaId` odkazuje na `areas`. `imageData` je

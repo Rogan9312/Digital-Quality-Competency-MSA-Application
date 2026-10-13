@@ -753,10 +753,10 @@
             </div>
 
             <div class="step-block">
-              <h3>Skryté mená v reportoch a dashboarde</h3>
-              <p class="step-sub">Zoznam všetkých mien, ktoré sa niekedy objavili v teste (registrovaní operátori aj manuálne napísané mená, napr. testovacie účty TST, TST1). Zaškrtnuté meno sa prestane počítať do Reportov aj Dashboardu (súhrny, grafy, matica), kým ho znova neodškrtnete.</p>
+              <h3>Správa mien operátorov v reportoch a dashboarde</h3>
+              <p class="step-sub">Zoznam všetkých mien, ktoré sa niekedy objavili v teste (registrovaní operátori aj manuálne napísané mená, napr. testovacie účty TST, TST1 alebo preklepy v mene). "Skrytý" meno vynechá z Reportov aj Dashboardu. "Premenovať" opraví meno vo všetkých jeho výsledkoch naraz — ak sa po oprave zhoduje s iným existujúcim menom (napr. preklep zjednotený na správny tvar), oba sa spoja do jedného operátora vo vyhodnotení.</p>
               <table class="rtable">
-                <thead><tr><th>Meno</th><th>Skrytý</th></tr></thead>
+                <thead><tr><th>Meno</th><th>Testov</th><th>Skrytý</th><th></th></tr></thead>
                 <tbody id="hidden-operators-tbody"></tbody>
               </table>
               <div class="empty-state" id="hidden-operators-empty" style="display:none;">Zatiaľ žiadne mená operátorov — objavia sa tu po prvom dokončenom teste.</div>
@@ -1887,31 +1887,100 @@
 
   /* Zoznam VŠETKÝCH mien, ktoré sa niekedy objavili v teste (registrovaní
      operátori s kartou aj manuálne napísané mená ako "TST") — na rozdiel
-     od tabuľky vyššie, ktorá rieši len RFID/NFC karty. Zaškrtnutím sa
-     meno pridá do hiddenOperatorNames a prestane sa počítať v Reportoch
-     aj Dashboarde (pozri isOperatorHidden() filter v oboch). */
+     od tabuľky vyššie, ktorá rieši len RFID/NFC karty. Dve akcie na meno:
+     - Skrytý/Viditeľný: zaškrtnuté meno sa prestane počítať v Reportoch
+       aj Dashboarde (pozri isOperatorHidden() filter v oboch).
+     - Premenovať: opraví preklep vo VŠETKÝCH výsledkoch naraz (pozri
+       renameOperatorEverywhere nižšie) — ak nové meno splýva s iným už
+       existujúcim menom, obaja operátori sa v reportoch/dashboarde
+       automaticky spoja do jedného, lebo tam všade sa zoskupuje podľa
+       reťazca operatorName. */
   var hiddenOperatorsTbody = document.getElementById('hidden-operators-tbody');
   var hiddenOperatorsEmpty = document.getElementById('hidden-operators-empty');
-  function renderHiddenOperatorsList(){
+  function renderOperatorNamesList(){
     idbGetAll('attempts').then(function(attempts){
       var roster = buildOperatorRoster(attempts);
+      var countByName = {};
+      attempts.forEach(function(a){ countByName[a.operatorName] = (countByName[a.operatorName]||0) + 1; });
       hiddenOperatorsTbody.innerHTML = '';
       hiddenOperatorsEmpty.style.display = roster.length===0 ? 'block' : 'none';
       roster.forEach(function(name){
         var tr = document.createElement('tr');
         var td1 = document.createElement('td'); td1.textContent = name; tr.appendChild(td1);
-        var td2 = document.createElement('td');
+        var td2 = document.createElement('td'); td2.textContent = countByName[name]||0; tr.appendChild(td2);
+        var td3 = document.createElement('td');
         var hidden = isOperatorHidden(name);
         var chip = document.createElement('span');
         chip.className = 'badge badge-toggle ' + (hidden ? 'nok' : 'ok');
         chip.textContent = hidden ? 'Skrytý' : 'Viditeľný';
         chip.title = 'Kliknutím ' + (hidden ? 'znova zobrazíte' : 'skryjete') + ' meno „' + name + '“ v Reportoch a Dashboarde';
         chip.addEventListener('click', function(){
-          setOperatorHidden(name, !hidden).then(renderHiddenOperatorsList);
+          setOperatorHidden(name, !hidden).then(renderOperatorNamesList);
         });
-        td2.appendChild(chip); tr.appendChild(td2);
+        td3.appendChild(chip); tr.appendChild(td3);
+        var td4 = document.createElement('td');
+        var renameBtn = document.createElement('button');
+        renameBtn.className = 'btn btn-ghost btn-sm'; renameBtn.textContent = '✎ Premenovať';
+        renameBtn.title = 'Opraviť meno „' + name + '“ vo všetkých jeho výsledkoch naraz';
+        renameBtn.addEventListener('click', function(){ promptRenameOperator(name, countByName[name]||0, roster); });
+        td4.appendChild(renameBtn); tr.appendChild(td4);
         hiddenOperatorsTbody.appendChild(tr);
       });
+    });
+  }
+
+  function promptRenameOperator(oldName, oldCount, roster){
+    var newName = prompt('Opraviť meno operátora „' + oldName + '“ (' + oldCount + ' test' + (oldCount===1?'':(oldCount<5?'y':'ov')) + ') na:', oldName);
+    if(newName===null) return;
+    newName = newName.trim();
+    if(!newName || newName===oldName) return;
+    var collidesWith = roster.filter(function(n){ return n!==oldName; }).find(function(n){ return n===newName; });
+    var msg = collidesWith
+      ? 'Meno „' + oldName + '“ sa premenuje na „' + newName + '“ a SPOJÍ s existujúcim operátorom „' + newName + '“ — ich výsledky sa odteraz budú počítať ako jeden operátor. Pokračovať?'
+      : 'Premenovať „' + oldName + '“ na „' + newName + '“ vo všetkých jeho výsledkoch?';
+    if(!confirm(msg)) return;
+    renameOperatorEverywhere(oldName, newName).then(function(){
+      renderOperatorNamesList();
+      renderReportsPanel();
+      renderDashboard();
+      renderOperatorsList();
+    });
+  }
+
+  /* Premenuje meno operátora VŠADE, kde sa v appke vyskytuje ako reťazec
+     (nie je to cudzí kľúč, appka ho ukladá priamo do každého záznamu):
+     attempts.operatorName (samotné výsledky), operators.name (ak je meno
+     naviazané na RFID/NFC kartu, aby budúce testy cez tú kartu používali
+     opravené meno), qualityAlertAcks.operatorName (aby sa aj história
+     "kto videl upozornenie" spojila) a hiddenOperatorNames (aby si
+     premenovanie zachovalo stav skrytia). Keďže Reporty aj Dashboard
+     zoskupujú operátorov podľa tohto reťazca, zhoda s iným existujúcim
+     menom po premenovaní ich automaticky spojí do jedného bez ďalšieho kroku. */
+  function renameOperatorEverywhere(oldName, newName){
+    return Promise.all([idbGetAll('attempts'), idbGetAll('operators'), idbGetAll('qualityAlertAcks')]).then(function(res){
+      var attempts = res[0], operators = res[1], acks = res[2];
+      var writes = [];
+      attempts.forEach(function(a){
+        if(a.operatorName===oldName){ a.operatorName = newName; writes.push(idbPut('attempts', a)); }
+      });
+      operators.forEach(function(o){
+        if(o.name===oldName){
+          o.name = newName;
+          writes.push(idbPut('operators', o).then(function(){
+            var idx = allOperators.findIndex(function(x){ return x.id===o.id; });
+            if(idx>=0) allOperators[idx] = o;
+          }));
+        }
+      });
+      acks.forEach(function(ack){
+        if(ack.operatorName===oldName){ ack.operatorName = newName; writes.push(idbPut('qualityAlertAcks', ack)); }
+      });
+      if(isOperatorHidden(oldName)){
+        hiddenOperatorNames = hiddenOperatorNames.filter(function(n){ return n!==oldName; });
+        if(hiddenOperatorNames.indexOf(newName)===-1) hiddenOperatorNames.push(newName);
+        writes.push(idbPut('kv', {key:'hiddenOperatorNames', names:hiddenOperatorNames}));
+      }
+      return Promise.all(writes);
     });
   }
 
@@ -2186,7 +2255,7 @@
     atabDashboard.classList.toggle('is-active', name==='dashboard');
   }
   atabSetup.addEventListener('click', function(){ showAdminPanel('setup'); });
-  atabOperators.addEventListener('click', function(){ showAdminPanel('operators'); renderOperatorsList(); renderHiddenOperatorsList(); });
+  atabOperators.addEventListener('click', function(){ showAdminPanel('operators'); renderOperatorsList(); renderOperatorNamesList(); });
   atabQalerts.addEventListener('click', function(){
     showAdminPanel('qalerts');
     refreshQaAreaSelect();
