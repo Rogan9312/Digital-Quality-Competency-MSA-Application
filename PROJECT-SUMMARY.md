@@ -37,6 +37,9 @@ logiky appky sa vďaka tomu nemusel meniť):
   Administrácie, pozri nižšie). Pôvodný `adminAuth` záznam (text heslo)
   z pred-Firebase verzie odpadol — nahradilo ho Firebase Authentication
   pre celú appku plus samostatný `adminPin` len pre Administráciu.
+  `hiddenOperatorNames` (`{key, names:[...]}`) — mená operátorov (napr.
+  testovacie účty "TST", "TST1"), ktoré sa nemajú počítať do Reportov ani
+  Dashboardu, pozri nižšie.
 - `areas` (doc id = `id`) — **Sekcie/projekty**: `{id, label, createdAt}`.
   Nadradená kategória nad dávkami (napr. "Dvere W177").
 - `batches` (doc id = `id`) — **Dávky**: `{id, label, createdAt, areaId}`.
@@ -226,6 +229,32 @@ logiky appky sa vďaka tomu nemusel meniť):
   `{id, badgeId, name, createdAt}`. `badgeId` je jedinečný reťazec z karty
   (čítačka funguje ako klávesnica — "napíše" ho a odošle Enter). Spravuje
   sa v Administrácii → záložka "Operátori".
+
+  **Skryté mená operátorov (testovacie účty a pod.) v Reportoch a
+  Dashboarde.** Keďže operátor pri teste môže zadať AKÉKOĽVEK meno (nielen
+  registrovaný badge), reálne dáta obsahujú aj testovacie mená ("TST",
+  "TST1"...), ktoré sa nemajú počítať do výkonnostných čísiel. Riešenie je
+  nezávislé od `rec.archived` (ten archivuje jednotlivé VÝSLEDKY testov,
+  toto skrýva mená PERMANENTNE naprieč všetkými výsledkami):
+  - `hiddenOperatorNames` (string[], perzistované v `kv.hiddenOperatorNames`,
+    `{key, names}`) — načíta sa v `init()`. `isOperatorHidden(name)` /
+    `setOperatorHidden(name, hidden)` (ten druhý zapíše do `kv` a hneď
+    prekresli `renderReportsPanel()` aj `renderDashboard()`).
+  - UI: Administrácia → Operátori → nový blok "Skryté mená v reportoch a
+    dashboarde" (`#hidden-operators-tbody`) — tabuľka VŠETKÝCH mien, ktoré
+    sa niekedy objavili v `attempts` (union registrovaných operátorov a
+    manuálne napísaných mien, cez `buildOperatorRoster(attempts)` — rovnaká
+    funkcia ako pri rostri Quality Alert "kto videl"), každé s klikateľným
+    `.badge-toggle` odznakom "Viditeľný"/"Skrytý".
+  - Filter sa aplikuje v `renderReportsPanel()` (hneď po `idbGetAll('attempts')`,
+    pred archívnym/dátumovým filtrom — takže aj súhrny, CSV export a
+    "Prehľad podľa dávok" sú bez skrytých mien) a v Dashboarde v
+    `refreshDashboardOperators()` (nezobrazí sa ani vo filtri "Operátor")
+    a `renderDashboard()` (vynechané zo `scoped`, takže automaticky aj z
+    Matice, grafov, trendu cez `computeOperatorStats`/`renderOperatorComparison`).
+    Quality Alert "kto videl" roster/matica (`qaOperatorRoster`) sa
+    ZÁMERNE nefiltruje — skrývanie je len pre výkonnostné reporty, nie pre
+    sledovanie, kto si prečítal upozornenie.
 - `qualityAlerts` (doc id = `id`) — upozornenia viazané na Sekciu:
   `{id, areaId, title, description, imageData, dateFrom, durationDays,
   isActive, createdAt}`. `areaId` odkazuje na `areas`. `imageData` je
@@ -354,10 +383,11 @@ nekonvertujú, keďže sa nikde spätne nečítajú.
    (`{key:'adminPin', hash, salt}` — v tej istej kolekcii `kv`, kde je aj
    `activeBatchId`, ale pod iným kľúčom než malo pôvodné `adminAuth` pred
    Firebase migráciou, aby nedošlo k zámene s Firebase Auth). UI: 4
-   samostatné číslicové polia (`input type="tel" inputmode="numeric"`)
-   s automatickým presunom na ďalšie pole (`setupPinBoxes()` helper) —
-   žiadna vlastná numerická klávesnica na obrazovke, spolieha sa na
-   natívnu numerickú klávesnicu mobilu/tabletu z `inputmode="numeric"`.
+   samostatné číslicové polia (`input type="password" inputmode="numeric"`
+   — `type="password"` maskuje zadávané číslice bodkami/hviezdičkami, aj
+   keď niekto stojí za operátorom; `inputmode="numeric"` nezávisle od typu
+   zabezpečuje, že mobil/tablet aj tak ponúkne numerickú klávesnicu)
+   s automatickým presunom na ďalšie pole (`setupPinBoxes()` helper).
    Zámerne **spoločný PIN pre všetkých**, nie per-osoba — jednoduchšie
    a spoľahlivejšie riešenie, žiadna správa viacerých PIN kódov.
    **Automatické odomknutie PIN gate pri odchode zo záložky:** prepnutie

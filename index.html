@@ -597,19 +597,19 @@
             <div class="field">
               <label>Nový PIN</label>
               <div class="pin-input-row" id="pin-setup-row-1">
-                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 1">
-                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 2">
-                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 3">
-                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 4">
+                <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 1">
+                <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 2">
+                <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 3">
+                <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Číslica 4">
               </div>
             </div>
             <div class="field">
               <label>Potvrďte PIN</label>
               <div class="pin-input-row" id="pin-setup-row-2">
-                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 1">
-                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 2">
-                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 3">
-                <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 4">
+                <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 1">
+                <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 2">
+                <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 3">
+                <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="Potvrdenie 4">
               </div>
               <div class="field-error" id="pin-setup-error" style="display:none;"></div>
             </div>
@@ -619,10 +619,10 @@
             <h2 class="scr-title">Zadajte PIN</h2>
             <p class="scr-sub" style="margin-bottom:18px;">Táto sekcia je chránená PIN kódom.</p>
             <div class="pin-input-row" id="pin-login-row">
-              <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 1">
-              <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 2">
-              <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 3">
-              <input type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 4">
+              <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 1">
+              <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 2">
+              <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 3">
+              <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="1" class="pin-digit" aria-label="PIN číslica 4">
             </div>
             <div class="field-error" id="pin-login-error" style="display:none;">Nesprávny PIN.</div>
             <button class="btn btn-primary btn-block" id="btn-pin-login" style="margin-top:14px;">Vstúpiť</button>
@@ -750,6 +750,16 @@
                 <tbody id="operators-tbody"></tbody>
               </table>
               <div class="empty-state" id="operators-empty" style="display:none;">Zatiaľ žiadni operátori. Pridajte prvého vyššie.</div>
+            </div>
+
+            <div class="step-block">
+              <h3>Skryté mená v reportoch a dashboarde</h3>
+              <p class="step-sub">Zoznam všetkých mien, ktoré sa niekedy objavili v teste (registrovaní operátori aj manuálne napísané mená, napr. testovacie účty TST, TST1). Zaškrtnuté meno sa prestane počítať do Reportov aj Dashboardu (súhrny, grafy, matica), kým ho znova neodškrtnete.</p>
+              <table class="rtable">
+                <thead><tr><th>Meno</th><th>Skrytý</th></tr></thead>
+                <tbody id="hidden-operators-tbody"></tbody>
+              </table>
+              <div class="empty-state" id="hidden-operators-empty" style="display:none;">Zatiaľ žiadne mená operátorov — objavia sa tu po prvom dokončenom teste.</div>
             </div>
           </div>
         </div>
@@ -1337,6 +1347,17 @@
   var adminPinHash = null;    // {key:'adminPin', hash, salt} loaded from Firestore, or null if not set yet
   var adminPinVerified = false;
 
+  var hiddenOperatorNames = []; // string[] — mená (napr. testovacie "TST", "TST1"), ktoré sa nemajú počítať do Reportov ani Dashboardu; {key:'hiddenOperatorNames', names:[...]} v kv
+  function isOperatorHidden(name){ return hiddenOperatorNames.indexOf(name)!==-1; }
+  function setOperatorHidden(name, hidden){
+    if(hidden){ if(!isOperatorHidden(name)) hiddenOperatorNames.push(name); }
+    else { hiddenOperatorNames = hiddenOperatorNames.filter(function(n){ return n!==name; }); }
+    return idbPut('kv', {key:'hiddenOperatorNames', names:hiddenOperatorNames}).then(function(){
+      renderReportsPanel();
+      renderDashboard();
+    });
+  }
+
   var allOperators = [];      // {id, badgeId, name, createdAt} — RFID/NFC card → operator name
   var editingOperatorId = null;
 
@@ -1432,6 +1453,9 @@
   function init(){
     idbGet('kv','adminPin').then(function(rec){
       adminPinHash = rec || null;
+      return idbGet('kv','hiddenOperatorNames');
+    }).then(function(rec){
+      hiddenOperatorNames = (rec && rec.names) || [];
       return ensureBatchesExist();
     }).then(function(){
       return idbGetAll('areas');
@@ -1861,6 +1885,36 @@
     if(fieldOperatorBadge.value.trim()) saveOperatorForm(); else fieldOperatorBadge.focus();
   });
 
+  /* Zoznam VŠETKÝCH mien, ktoré sa niekedy objavili v teste (registrovaní
+     operátori s kartou aj manuálne napísané mená ako "TST") — na rozdiel
+     od tabuľky vyššie, ktorá rieši len RFID/NFC karty. Zaškrtnutím sa
+     meno pridá do hiddenOperatorNames a prestane sa počítať v Reportoch
+     aj Dashboarde (pozri isOperatorHidden() filter v oboch). */
+  var hiddenOperatorsTbody = document.getElementById('hidden-operators-tbody');
+  var hiddenOperatorsEmpty = document.getElementById('hidden-operators-empty');
+  function renderHiddenOperatorsList(){
+    idbGetAll('attempts').then(function(attempts){
+      var roster = buildOperatorRoster(attempts);
+      hiddenOperatorsTbody.innerHTML = '';
+      hiddenOperatorsEmpty.style.display = roster.length===0 ? 'block' : 'none';
+      roster.forEach(function(name){
+        var tr = document.createElement('tr');
+        var td1 = document.createElement('td'); td1.textContent = name; tr.appendChild(td1);
+        var td2 = document.createElement('td');
+        var hidden = isOperatorHidden(name);
+        var chip = document.createElement('span');
+        chip.className = 'badge badge-toggle ' + (hidden ? 'nok' : 'ok');
+        chip.textContent = hidden ? 'Skrytý' : 'Viditeľný';
+        chip.title = 'Kliknutím ' + (hidden ? 'znova zobrazíte' : 'skryjete') + ' meno „' + name + '“ v Reportoch a Dashboarde';
+        chip.addEventListener('click', function(){
+          setOperatorHidden(name, !hidden).then(renderHiddenOperatorsList);
+        });
+        td2.appendChild(chip); tr.appendChild(td2);
+        hiddenOperatorsTbody.appendChild(tr);
+      });
+    });
+  }
+
   /* =========================================================
      ADMIN: QUALITY ALERTS
   ========================================================= */
@@ -2132,7 +2186,7 @@
     atabDashboard.classList.toggle('is-active', name==='dashboard');
   }
   atabSetup.addEventListener('click', function(){ showAdminPanel('setup'); });
-  atabOperators.addEventListener('click', function(){ showAdminPanel('operators'); renderOperatorsList(); });
+  atabOperators.addEventListener('click', function(){ showAdminPanel('operators'); renderOperatorsList(); renderHiddenOperatorsList(); });
   atabQalerts.addEventListener('click', function(){
     showAdminPanel('qalerts');
     refreshQaAreaSelect();
@@ -2662,7 +2716,8 @@
     var dateFromVal = document.getElementById('report-date-from').value;
     var dateToVal = document.getElementById('report-date-to').value;
     var sortVal = document.getElementById('report-sort-select').value || 'score-asc';
-    idbGetAll('attempts').then(function(allAttemptsRaw){
+    idbGetAll('attempts').then(function(allAttemptsRaw0){
+      var allAttemptsRaw = allAttemptsRaw0.filter(function(a){ return !isOperatorHidden(a.operatorName); });
       var allAttempts = archiveVal==='active' ? allAttemptsRaw.filter(function(a){ return !a.archived; })
         : archiveVal==='archived' ? allAttemptsRaw.filter(function(a){ return !!a.archived; })
         : allAttemptsRaw.slice();
@@ -3067,7 +3122,7 @@
   function refreshDashboardOperators(){
     var batchIds = batchIdsForSelectedArea();
     return idbGetAll('attempts').then(function(all){
-      var relevant = all.filter(function(a){ return batchIds.indexOf(a.batchId)!==-1 && !a.archived; });
+      var relevant = all.filter(function(a){ return batchIds.indexOf(a.batchId)!==-1 && !a.archived && !isOperatorHidden(a.operatorName); });
       var names = [];
       relevant.forEach(function(a){ if(names.indexOf(a.operatorName)===-1) names.push(a.operatorName); });
       names.sort(function(a,b){ return a.localeCompare(b,'sk'); });
@@ -3100,7 +3155,7 @@
       var fromVal = dashDateFrom.value, toVal = dashDateTo.value;
 
       idbGetAll('attempts').then(function(all){
-        var scoped = all.filter(function(a){ return batchIds.indexOf(a.batchId)!==-1 && !a.archived; });
+        var scoped = all.filter(function(a){ return batchIds.indexOf(a.batchId)!==-1 && !a.archived && !isOperatorHidden(a.operatorName); });
         if(fromVal){ var fromTs0=new Date(fromVal+'T00:00:00').getTime(); scoped = scoped.filter(function(a){ return new Date(a.finishedAt).getTime()>=fromTs0; }); }
         if(toVal){ var toTs0=new Date(toVal+'T23:59:59').getTime(); scoped = scoped.filter(function(a){ return new Date(a.finishedAt).getTime()<=toTs0; }); }
 
