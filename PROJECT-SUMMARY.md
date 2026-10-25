@@ -616,6 +616,18 @@ očakáva zapnuté a nastavené:
 - Ďalšie úpravy vizuálu podľa feedbacku (dashboard prešiel niekoľkými
   iteráciami, momentálne v dobrom stave, ale používateľ evidentne rád ladí
   detaily — očakávaj ďalšie kozmetické požiadavky).
+- **Zvažovaná migrácia na Microsoft SQL Server** — [`sql-server-schema.sql`](./sql-server-schema.sql)
+  obsahuje relačnú schému (DDL), ktorá zrkadlí aktuálny Firestore dátový
+  model (areas/batches/photos/attempts+attempt_answers/operators/
+  quality_alerts/quality_alert_acks/app_settings/hidden_operator_names).
+  Je to LEN schéma — appka dnes volá Firestore priamo z prehliadača bez
+  vlastného backendu, čo pri SQL Serveri takto nejde (žiadny klientsky
+  JS SDK z prehliadača). Reálne presunutie appky na SQL Server by navyše
+  vyžadovalo: backend/API vrstvu medzi appkou a DB, prepísanie dátovej
+  vrstvy (`idbPut/idbGet/...`) na volania tejto API, riešenie
+  prihlásenia (Firebase Auth dnes stráži celú appku) a nové hosting
+  miesto pre backend (GitHub Pages servuje len statické súbory). Komentár
+  priamo v `.sql` súbore to rozoberá podrobnejšie.
 
 ## Ako pokračovať v Claude Code
 1. Otvor `hodnotenie-defektov.html` priamo — je to jediný súbor appky,
